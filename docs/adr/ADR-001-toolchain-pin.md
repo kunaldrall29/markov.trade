@@ -26,6 +26,8 @@ The pack assumes Anchor v1.0.x. On 2026-09-01 the facts are:
 
 **C. Anchor 2.0.0-rc.1.** Rejected: release candidate, 20 days old, no reason to carry that risk inside Gate B.
 
+Note on pack v0.2's "recommended Agave 3.1.10": that is the Solana release anchor-cli 1.1.2 installs by default (observed today), not the current Agave stable (4.2.2) and not what devnet runs (4.3.0-beta.3). Whether 3.1.10's `cargo-build-sbf` output runs on a 4.3 devnet is not in question (SBF programs are forward-compatible), but client crates (`solana-client`, LiteSVM) resolve against 4.x, so option B should pin Agave 4.2.2 explicitly rather than accept Anchor's default.
+
 ## Recommendation
 
 **B**, coupled to D3 = successor program (ADR-004). If D3 chooses an in-place upgrade of `5o8E…`, then **A** for the program crate only, with LiteSVM compatibility proven by a build in the P01 pre-flight before anything else is written.

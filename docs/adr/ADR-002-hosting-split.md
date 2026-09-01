@@ -20,9 +20,13 @@ Status: **Proposed — needs Kunal** · Date: 2026-09-01 · Seat: Surfaces · Bl
 - Pro: Kunal ships the landing independently, zero coupling.
 - Con: a rewrite at the apex still needs the apex to be a Vercel/Cloudflare project; the header/nav must be duplicated and kept identical; two `copy-grep` targets; cookie-less theme persistence differs per origin; the tape shows a hostname change unless the rewrite is used.
 
+## New input (2026-09-01, after the ADR was drafted)
+
+Kunal's `kunaldrall29/markov-landing-new` is not a static file; it is the TanStack Start app with `/`, `/book`, `/receipts` and `/paper` already sharing one shell, header and theme toggle, now imported at `apps/web`. The Grok project memory records the design lock: "`/` and `/book` should look like the same desk." Option B would mean splitting an app that already exists as one origin.
+
 ## Recommendation
 
-**A**, with the static landing file served verbatim as the `/` route until P12 ports it. Concretely: Vercel project for `apps/web` with domains `markov.trade` and `www.markov.trade`; Railway custom domain `api.markov.trade` on `data-api`; Cloudflare DNS: apex + `www` → Vercel, `api` → Railway (DNS-only, no Cloudflare proxy, so Vercel/Railway TLS works). CORS allowlist `https://markov.trade` only.
+**A**, using `apps/web` as-is for `/` (the port in P12 is now a diff against the imported app, not a rebuild from the static file). Concretely: Vercel project for `apps/web` with domains `markov.trade` and `www.markov.trade`; Railway custom domain `api.markov.trade` on `data-api`; Cloudflare DNS: apex + `www` → Vercel, `api` → Railway (DNS-only, no Cloudflare proxy, so Vercel/Railway TLS works). CORS allowlist `https://markov.trade` only.
 
 ## What changes if Kunal picks B
 

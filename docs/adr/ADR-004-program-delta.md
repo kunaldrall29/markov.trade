@@ -38,7 +38,9 @@ The delta is not a few fields. Every account layout, seed, instruction and event
 
 **A.** It is the only route that does not depend on locating a private key this session could not find, it avoids writing a migration for throwaway demo accounts, and it lets D0 choose Anchor 1.1.2 freely. The cost is a second program ID in FACTS with a one-line explanation, which is cheaper than any of B's costs.
 
-Regardless of A or B: `docs/10-PROGRAM-SPEC.md` §1, §2, §4 must be amended to the chain's names and numbering **before P02 starts**, and `docs/11` §4 / the guard fixtures / `docs/12` schema must use `Unauthorized` and `ProgramNotAllowed`, not the pack's invented names.
+Engineering pack v0.2 (adopted 2026-09-01) does not change this: its `CORRECTIONS.md` still lists the "historical eleven" as `Paused, Revoked, Expired, NotOperator, VenueNotAllowed, …` and says "discriminants from the deployed IDL" — the deployed program has no on-chain IDL, and the checked-in IDL plus 20 on-chain refusal payloads give `OverTxCap`=0 … `Unauthorized`=10.
+
+Regardless of A or B: `docs/10-PROGRAM-SPEC.md` §1, §2, §4 and `CORRECTIONS.md` must be amended to the chain's names and numbering **before P02 starts**, and `docs/11` §4 / the guard fixtures / `docs/12` schema must use `Unauthorized` and `ProgramNotAllowed`, not the pack's invented names.
 
 ## Open inputs from Kunal
 
