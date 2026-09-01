@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Markov">
+  <rect width="32" height="32" rx="6" fill="#111110"/>
+  <g transform="translate(16 16.2) scale(0.9) translate(-14 -16)">
+    <path fill="#f4f3ef" d="M2.4 30V2h4.9L14 17.6 20.7 2h4.9v28h-3.7V12.6L14 26.4 6.1 12.6V30H2.4z"/>
+    <circle cx="14" cy="17.6" r="1.55" fill="#e07068"/>
+  </g>
+</svg>

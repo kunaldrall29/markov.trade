@@ -1,0 +1,10 @@
+node_modules/
+.project_id
+.github_repo
+.env
+.env.*
+.vercel/
+.output/
+dist/
+.grok/*
+!.grok/app-env.json
