@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Markov Book</title>
+<meta name="description" content="Deposit USDC. A house agent runs a bounded book on Solana perps. You can withdraw. Every fill and every refusal is a public receipt." />
+<meta name="theme-color" content="#f6f5f1" />
+<meta property="og:title" content="Markov Book" />
+<meta property="og:description" content="Deposit USDC. A house agent runs a bounded book on Solana perps. You can withdraw. Every fill and every refusal is a public receipt." />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap" />
+<script>
+  /* no-flash theme boot: must run before first paint */
+  (function () {
+    try {
+      var t = localStorage.getItem("markov-theme");
+      var d = t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      if (d) document.documentElement.classList.add("dark");
+    } catch (e) {}
+  })();
+</script>
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Tokens — lifted verbatim from the Markov Book design system
+   ───────────────────────────────────────────────────────────── */
+:root{
+  color-scheme: light;
+  --mk-bg:#f6f5f1; --mk-surface:#fff; --mk-raised:#eceae4;
+  --mk-fg:#161513; --mk-muted:#5c5953; --mk-subtle:#8a8680;
+  --mk-line:#1615131a; --mk-line-strong:#16151338;
+  --mk-allow:#2c6b48; --mk-refuse:#a33b32; --mk-refuse-fg:#fff;
+  --mk-accent:#161513; --mk-accent-fg:#f6f5f1;
+
+  --font-sans:"Outfit","Segoe UI",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SF Mono",monospace;
+
+  --radius-xs:6px; --radius-sm:10px; --radius-md:16px; --radius-lg:24px;
+  --ease-smooth:cubic-bezier(.22,1,.36,1);
+  --hairline:0 0 0 1px var(--mk-line);
+  --hairline-strong:0 0 0 1px var(--mk-line-strong);
+  --wrap:72rem;
+}
+html.dark{
+  color-scheme: dark;
+  --mk-bg:#111110; --mk-surface:#1a1a18; --mk-raised:#242422;
+  --mk-fg:#f4f3ef; --mk-muted:#a8a59e; --mk-subtle:#6f6c66;
+  --mk-line:#f4f3ef1f; --mk-line-strong:#f4f3ef47;
+  --mk-allow:#6fba88; --mk-refuse:#e07068; --mk-refuse-fg:#161513;
+  --mk-accent:#f4f3ef; --mk-accent-fg:#111110;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--mk-bg); color:var(--mk-fg);
+  font-family:var(--font-sans); font-size:16px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--mk-accent);outline-offset:2px;border-radius:var(--radius-xs)}
+.wrap{max-width:var(--wrap);margin-inline:auto;padding-inline:1.25rem}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.hairline{box-shadow:var(--hairline)}
+.hairline-hover:hover{box-shadow:var(--hairline-strong)}
+.muted{color:var(--mk-muted)} .subtle{color:var(--mk-subtle)}
+.allow{color:var(--mk-allow)} .refuse{color:var(--mk-refuse)}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mk-subtle);margin:0}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ── header ─────────────────────────────────────────────── */
+header{position:sticky;top:0;z-index:40;padding:.75rem .75rem 0}
+.bar{
+  max-width:var(--wrap);margin-inline:auto;display:flex;align-items:center;
+  justify-content:space-between;gap:.75rem;padding:.5rem .75rem;
+  border-radius:var(--radius-lg);background:color-mix(in srgb,var(--mk-surface) 80%,transparent);
+  backdrop-filter:blur(12px);box-shadow:var(--hairline)
+}
+.mark{display:inline-flex;align-items:center;gap:.12em;font-weight:600;letter-spacing:.12em;font-size:15px;padding-inline:.375rem}
+.mark svg{height:.96em;width:.84em;flex:none}
+nav{display:flex;align-items:center;gap:.125rem;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav a{min-height:2.5rem;display:inline-flex;align-items:center;padding:.5rem .75rem;border-radius:var(--radius-sm);font-size:14px;color:var(--mk-muted);transition:color .15s,background-color .15s;white-space:nowrap}
+nav a:hover{color:var(--mk-fg)}
+nav a[aria-current="page"]{background:var(--mk-raised);color:var(--mk-fg)}
+.headend{display:flex;align-items:center;gap:.25rem}
+.net{display:none;align-items:center;gap:.5rem;padding-right:.5rem}
+@media(min-width:640px){.net{display:flex}}
+.dot{width:6px;height:6px;border-radius:999px;background:var(--mk-allow);flex:none}
+.dot.live{animation:pulse-live 1.8s ease-in-out infinite}
+.toggle{display:grid;place-items:center;width:2.5rem;height:2.5rem;border:0;background:transparent;color:var(--mk-fg);border-radius:var(--radius-sm);cursor:pointer}
+.toggle:hover{background:var(--mk-raised)}
+.toggle svg{width:1rem;height:1rem}
+html:not(.dark) .icon-sun{display:none}
+html.dark .icon-moon{display:none}
+
+/* ── buttons ────────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+  font-family:var(--font-sans);font-size:14px;font-weight:600;letter-spacing:-.01em;
+  min-height:2.75rem;padding-inline:1.25rem;border-radius:var(--radius-sm);border:0;cursor:pointer;
+  transition:transform .15s ease-out,background-color .15s,box-shadow .15s,color .15s;
+}
+.btn:active{transform:scale(.96)}
+.btn-primary{background:var(--mk-accent);color:var(--mk-accent-fg)}
+.btn-primary:hover{opacity:.9}
+.btn-ghost{background:transparent;color:var(--mk-fg);box-shadow:var(--hairline)}
+.btn-ghost:hover{background:var(--mk-raised)}
+.btn-quiet{background:var(--mk-raised);color:var(--mk-fg)}
+.btn-quiet:hover{background:var(--mk-surface)}
+.btn-kill{background:var(--mk-refuse);color:var(--mk-refuse-fg)}
+.btn-kill:hover{opacity:.9}
+.btn-sm{min-height:2.5rem;padding-inline:.75rem;font-size:12px}
+
+/* ── hero ───────────────────────────────────────────────── */
+.hero{position:relative;overflow:hidden}
+.hero-canvas{
+  position:absolute;inset:0;pointer-events:none;
+  -webkit-mask-image:linear-gradient(180deg,#000,transparent 65%);
+          mask-image:linear-gradient(180deg,#000,transparent 65%);
+}
+@media(min-width:1024px){
+  .hero-canvas{-webkit-mask-image:linear-gradient(90deg,transparent 8%,#000 58%);mask-image:linear-gradient(90deg,transparent 8%,#000 58%)}
+}
+.hero-canvas canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.7}
+.hero-grid{position:relative;display:grid;gap:2.5rem;align-items:center;padding-block:3rem}
+@media(min-width:1024px){.hero-grid{grid-template-columns:1.1fr .9fr;padding-block:4rem}}
+.pill{display:inline-flex;align-items:center;gap:.5rem;padding:.25rem .75rem;border-radius:999px;font-family:var(--font-mono);font-size:11px;color:var(--mk-muted);box-shadow:var(--hairline);margin:0}
+h1{margin:1.5rem 0 0;font-size:clamp(2.75rem,8vw,4.5rem);font-weight:600;line-height:.95;letter-spacing:-.03em}
+.lede{margin:1.5rem 0 0;max-width:28rem;color:var(--mk-muted);line-height:1.65}
+.cta{margin-top:2rem;display:flex;flex-wrap:wrap;gap:.75rem}
+
+/* ── blotter ────────────────────────────────────────────── */
+.blotter{position:relative;overflow:hidden;border-radius:var(--radius-md);background:var(--mk-surface);box-shadow:var(--hairline)}
+.scan-wrap{position:absolute;inset-inline:0;top:0;height:1px;overflow:hidden;pointer-events:none}
+.scan-bar{height:2rem;width:100%;background:linear-gradient(to bottom,color-mix(in srgb,var(--mk-accent) 40%,transparent),transparent);animation:scan 3.2s linear infinite}
+.blotter-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.75rem 1rem;border-bottom:1px solid var(--mk-line)}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--mk-line);margin:0}
+@media(min-width:640px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--mk-raised);padding:.75rem 1rem}
+.tile dt{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mk-subtle)}
+.tile dd{margin:.25rem 0 0;font-family:var(--font-mono);font-size:1.25rem;font-variant-numeric:tabular-nums}
+.tile p{margin:0;font-family:var(--font-mono);font-size:10px;color:var(--mk-subtle)}
+.circuit{display:flex;align-items:center;justify-content:space-between;padding:.5rem 1rem;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.tape{list-style:none;margin:0;padding:0;max-height:16rem;overflow:auto;border-top:1px solid var(--mk-line)}
+.tape li{
+  display:grid;grid-template-columns:3rem 1fr auto;gap:.5rem;align-items:center;
+  padding:.625rem 1rem;font-family:var(--font-mono);font-size:12px;font-variant-numeric:tabular-nums;
+}
+@media(min-width:768px){.tape li{grid-template-columns:3rem 1fr 4.5rem auto}}
+.tape .qty{display:none;text-align:right;color:var(--mk-muted)}
+@media(min-width:768px){.tape .qty{display:block}}
+.tape .res{text-align:right;font-size:11px;font-weight:500;text-transform:uppercase}
+.tape-in{animation:tape-in .22s var(--ease-smooth) both}
+.verbs{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;padding:.75rem;border-top:1px solid var(--mk-line)}
+@media(min-width:640px){.verbs{grid-template-columns:repeat(4,1fr)}}
+.verbs .btn{width:100%}
+.verbs-note{margin:0;padding:0 .75rem .75rem;font-family:var(--font-mono);font-size:10px;color:var(--mk-subtle)}
+
+/* ── marquee ────────────────────────────────────────────── */
+.marquee{position:relative;overflow:hidden;border-block:1px solid var(--mk-line);background:var(--mk-raised)}
+.marquee-track{display:flex;width:max-content;gap:2rem;padding-block:.75rem;animation:marquee 28s linear infinite}
+.marquee span.row{display:flex;align-items:center;gap:.75rem;font-family:var(--font-mono);font-size:12px;white-space:nowrap}
+
+/* ── sections ───────────────────────────────────────────── */
+section.band{padding-block:4rem}
+section.band.tall{padding-block:5rem}
+.cards-3{display:grid;gap:.75rem}
+@media(min-width:768px){.cards-3{grid-template-columns:repeat(3,1fr)}}
+.card{border-radius:var(--radius-md);background:var(--mk-surface);padding:1.5rem;box-shadow:var(--hairline)}
+.card h2{margin:.75rem 0 0;font-size:1.5rem;font-weight:600;letter-spacing:-.02em}
+.card p.body{margin:.75rem 0 0;font-size:14px;line-height:1.65;color:var(--mk-muted)}
+h2.section{margin:.75rem 0 0;font-size:clamp(2rem,5vw,3rem);font-weight:600;letter-spacing:-.03em;max-width:36rem}
+.grid-2{display:grid;gap:.75rem;margin-top:2.5rem}
+@media(min-width:768px){.grid-2{grid-template-columns:repeat(2,1fr)}}
+.grid-2 article{border-radius:var(--radius-md);background:var(--mk-surface);padding:1.25rem;box-shadow:var(--hairline);transition:box-shadow .15s}
+.grid-2 article:hover{box-shadow:var(--hairline-strong)}
+.grid-2 h3{margin:.5rem 0 0;font-size:1.25rem;font-weight:600;letter-spacing:-.02em}
+.grid-2 p{margin:.5rem 0 0;font-size:14px;line-height:1.65;color:var(--mk-muted)}
+.grid-4{display:grid;gap:.75rem;margin-top:2rem}
+@media(min-width:640px){.grid-4{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1024px){.grid-4.four{grid-template-columns:repeat(4,1fr)}}
+.grid-4 .cell{border-radius:var(--radius-md);background:var(--mk-surface);padding:1.25rem;box-shadow:var(--hairline)}
+.cell .name{margin:0;font-size:1.125rem;font-weight:600}
+.cell .them{margin:.5rem 0 0;font-size:14px;color:var(--mk-subtle)}
+.cell .us{margin:.25rem 0 0;font-size:14px;color:var(--mk-allow)}
+.cell .body{margin:.5rem 0 0;font-size:14px;line-height:1.65;color:var(--mk-muted)}
+
+/* ── faq ────────────────────────────────────────────────── */
+.faq{margin-top:2rem;border-radius:var(--radius-md);background:var(--mk-surface);box-shadow:var(--hairline);overflow:hidden}
+.faq details+details{border-top:1px solid var(--mk-line)}
+.faq summary{
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  min-height:3.5rem;padding:.75rem 1.25rem;cursor:pointer;list-style:none;
+  font-size:14px;font-weight:500;
+}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary .plus{font-family:var(--font-mono);color:var(--mk-accent);transition:transform .15s}
+.faq details[open] summary .plus{transform:rotate(45deg)}
+.faq p{margin:0;padding:0 1.25rem 1rem;max-width:42rem;font-size:14px;line-height:1.65;color:var(--mk-muted)}
+
+/* ── close + footer ─────────────────────────────────────── */
+.close-panel{max-width:64rem;margin-inline:auto;border-radius:var(--radius-lg);background:var(--mk-fg);color:var(--mk-bg);padding:4rem 2rem}
+.close-panel p.big{margin:0;font-size:clamp(2rem,6vw,3.75rem);font-weight:600;letter-spacing:-.03em;line-height:1}
+.close-panel p.sub{margin:1rem 0 0;max-width:32rem;font-size:14px;color:color-mix(in srgb,var(--mk-bg) 70%,transparent)}
+.close-panel .btn{margin-top:2rem;background:var(--mk-bg);color:var(--mk-fg)}
+footer{border-top:1px solid var(--mk-line);padding-block:3rem;margin-top:1rem}
+.foot{display:flex;flex-direction:column;gap:1.5rem}
+@media(min-width:768px){.foot{flex-direction:row;align-items:flex-end;justify-content:space-between}}
+.foot .keep{margin:1rem 0 0;font-size:1.5rem;font-weight:600;letter-spacing:-.02em}
+.foot .principle{margin:.5rem 0 0;max-width:24rem;font-size:14px;color:var(--mk-muted)}
+.foot nav{display:flex;flex-wrap:wrap;gap:1.25rem;font-size:14px;color:var(--mk-muted)}
+
+/* ── motion ─────────────────────────────────────────────── */
+@keyframes tape-in{0%{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulse-live{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes marquee{0%{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes scan{0%{transform:translateY(-100%)}to{transform:translateY(400%)}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+  .marquee-track{animation:none}
+  .hero-canvas{display:none}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <a class="mark" href="/" aria-label="Markov">
+      <svg viewBox="0 0 28 32" aria-hidden="true"><path fill="currentColor" d="M2.4 30V2h4.9L14 17.6 20.7 2h4.9v28h-3.7V12.6L14 26.4 6.1 12.6V30H2.4z"/></svg>
+      <span>ARKOV</span>
+    </a>
+    <nav aria-label="Primary">
+      <a href="/" aria-current="page">Home</a>
+      <a href="/book">Desk</a>
+      <a href="/receipts">Receipts</a>
+      <a href="/paper">Paper</a>
+    </nav>
+    <div class="headend">
+      <span class="net"><span class="dot live"></span><span class="mono" style="font-size:11px;color:var(--mk-muted)">DEVNET</span></span>
+      <button class="toggle" id="theme" type="button" aria-label="Switch theme">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ── hero ─────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-canvas" aria-hidden="true"><canvas id="tape-canvas"></canvas></div>
+  <div class="wrap hero-grid">
+    <div>
+      <p class="pill"><span class="dot"></span>House book · Solana perps · unaudited</p>
+      <h1>Park USDC.<br />The book works.<br />You leave.</h1>
+      <p class="lede">Near delta-neutral intent on Solana perps. Funding when shorts are paid. Inventory cut in trend. The operator cannot withdraw. Every fill and every refusal is a public receipt.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="/book">Open the desk</a>
+        <button class="btn btn-ghost" type="button" id="watch-refusal">Watch a refusal</button>
+      </div>
+    </div>
+
+    <div class="blotter" id="blotter">
+      <div class="scan-wrap"><div class="scan-bar"></div></div>
+      <div class="blotter-head">
+        <span style="display:flex;align-items:center;gap:.5rem">
+          <span class="dot live" style="width:8px;height:8px"></span>
+          <span class="mono allow" style="font-size:11px">BOOK_ONE</span>
+        </span>
+        <span class="mono subtle" style="font-size:11px">marked · not a rate</span>
+      </div>
+
+      <dl class="tiles">
+        <div class="tile"><dt>net delta</dt><dd>$12.40</dd><p>±20</p></div>
+        <div class="tile"><dt>gross</dt><dd>$61</dd><p>cap 100</p></div>
+        <div class="tile"><dt>funded</dt><dd>0</dd><p>USDC-d</p></div>
+        <div class="tile"><dt>refusals</dt><dd class="refuse">3</dd><p>24h</p></div>
+      </dl>
+
+      <div class="circuit">
+        <span class="allow">circuit live</span>
+        <span class="subtle">skip = default</span>
+      </div>
+
+      <ol class="tape" id="tape" aria-live="polite"></ol>
+
+      <div class="verbs">
+        <button class="btn btn-ghost btn-sm" type="button">Fund</button>
+        <button class="btn btn-quiet btn-sm" type="button">Pause</button>
+        <button class="btn btn-kill btn-sm" type="button">Revoke</button>
+        <button class="btn btn-primary btn-sm" type="button">Withdraw</button>
+      </div>
+      <p class="verbs-note">withdraw stays on in every state · sample tape, devnet</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── marquee ──────────────────────────────────────────── -->
+<div class="marquee" aria-hidden="true"><div class="marquee-track" id="marquee"></div></div>
+
+<!-- ── job / wedge / proof ──────────────────────────────── -->
+<section class="band wrap">
+  <div class="cards-3">
+    <article class="card">
+      <p class="eyebrow">Job</p>
+      <h2>Idle USDC, no keys handed over.</h2>
+      <p class="body">Same job as the wrappers people already use. Someone good runs the book. You keep withdraw.</p>
+    </article>
+    <article class="card">
+      <p class="eyebrow">Wedge</p>
+      <h2>Runtime bounds. Not a rest-time audit.</h2>
+      <p class="body">April 2026 passed its audits and still drained. This account will not let the operator empty it.</p>
+    </article>
+    <article class="card">
+      <p class="eyebrow">Proof</p>
+      <h2>Refusals are on the tape.</h2>
+      <p class="body">A zero-refusal book is ordinary. The interesting row is the one that says no.</p>
+    </article>
+  </div>
+</section>
+
+<!-- ── how the desk works ───────────────────────────────── -->
+<section class="band tall wrap">
+  <p class="eyebrow">How the desk is allowed to work</p>
+  <h2 class="section">An LLM never signs.</h2>
+  <div class="grid-2">
+    <article><p class="eyebrow" style="letter-spacing:0">01</p><h3>Core</h3><p>Inventory bands, hedge ratio, max gross, kill conditions. Runs if every model is dead.</p></article>
+    <article><p class="eyebrow" style="letter-spacing:0">02</p><h3>Veto</h3><p>A model may propose. The guard may refuse. The refusal is a first-class event.</p></article>
+    <article><p class="eyebrow" style="letter-spacing:0">03</p><h3>Sidecar</h3><p>Funding, OI, liquidations, basis. Features — never an order router.</p></article>
+    <article><p class="eyebrow" style="letter-spacing:0">04</p><h3>Proof</h3><p>If a number cannot be checked from chain or venue APIs, it is not on this desk.</p></article>
+  </div>
+</section>
+
+<!-- ── not that ─────────────────────────────────────────── -->
+<section class="band wrap">
+  <p class="eyebrow">Not that</p>
+  <h2 class="section">A book. Not a costume.</h2>
+  <div class="grid-4">
+    <div class="cell"><p class="name">HLP</p><p class="them">Native order-book MM</p><p class="us">We don't pretend a pool venue is that book</p></div>
+    <div class="cell"><p class="name">JLP</p><p class="them">Long-biased basket + fees</p><p class="us">Different risk. Near delta-neutral</p></div>
+    <div class="cell"><p class="name">Marketplace</p><p class="them">Strangers selling books</p><p class="us">Phase 3. After a public curve</p></div>
+    <div class="cell"><p class="name">Token</p><p class="them">Ticker as the product</p><p class="us">No ticker in MVP</p></div>
+  </div>
+</section>
+
+<!-- ── owner verbs ──────────────────────────────────────── -->
+<section class="band wrap">
+  <p class="eyebrow">Owner verbs</p>
+  <h2 class="section">Always able to leave.</h2>
+  <div class="grid-4 four">
+    <div class="cell"><p class="name">Fund</p><p class="body">USDC-d in the mandate PDA — never the operator.</p></div>
+    <div class="cell"><p class="name">Pause</p><p class="body">Owner-only unpause.</p></div>
+    <div class="cell"><p class="name">Revoke</p><p class="body">Next intent refused. Receipt says Revoked.</p></div>
+    <div class="cell"><p class="name">Withdraw</p><p class="body">On in every state. Coins to you.</p></div>
+  </div>
+</section>
+
+<!-- ── faq ──────────────────────────────────────────────── -->
+<section class="band tall wrap" id="faq">
+  <p class="eyebrow">FAQ</p>
+  <h2 class="section">No APY on this page.</h2>
+  <div class="faq">
+    <details>
+      <summary>Is this yield I can take home?<span class="plus">+</span></summary>
+      <p>No. This is Solana devnet. Marks are marked PnL, not a promised rate. Unaudited. If a number cannot be checked from chain or the venue, it is not on this desk.</p>
+    </details>
+    <details>
+      <summary>Who can withdraw?<span class="plus">+</span></summary>
+      <p>Only the owner. Withdrawal authority never leaves the owner. It stays enabled in Active, Paused, Revoked, and Expired.</p>
+    </details>
+    <details>
+      <summary>Is this a vault?<span class="plus">+</span></summary>
+      <p>MVP is separately managed accounts: one mandate per depositor. Funds do not commingle. Pooling is a later decision, default still SMA.</p>
+    </details>
+    <details>
+      <summary>Is the agent an LLM?<span class="plus">+</span></summary>
+      <p>No. The book-core is deterministic and must run if every model is down. The risk guard is thresholds. A model may propose. An LLM never signs.</p>
+    </details>
+    <details>
+      <summary>Where is the marketplace?<span class="plus">+</span></summary>
+      <p>Not until the house book has a public curve. Book One is the only strategy on this page.</p>
+    </details>
+    <details>
+      <summary>What's the APY?<span class="plus">+</span></summary>
+      <p>There isn't one on this page.</p>
+    </details>
+  </div>
+</section>
+
+<!-- ── close ────────────────────────────────────────────── -->
+<section class="band tall" style="padding-inline:1.25rem">
+  <div class="close-panel">
+    <p class="big">Keep the pile.</p>
+    <p class="sub">Devnet. Marked. Unaudited. There is a book. It is bounded. You can take the coins out.</p>
+    <a class="btn" href="/book">Open the desk</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <span class="mark" style="font-size:14px" aria-label="Markov" role="img">
+        <svg viewBox="0 0 28 32" aria-hidden="true"><path fill="currentColor" d="M2.4 30V2h4.9L14 17.6 20.7 2h4.9v28h-3.7V12.6L14 26.4 6.1 12.6V30H2.4z"/></svg>
+        <span>ARKOV</span>
+      </span>
+      <p class="keep">Keep the pile.</p>
+      <p class="principle">Yield is the product. Authority is the lock. Receipts are the proof.</p>
+    </div>
+    <nav aria-label="Footer">
+      <a href="/book">Desk</a>
+      <a href="/receipts">Receipts</a>
+      <a href="/paper">Paper</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ── theme toggle ─────────────────────────────────────── */
+  var btn = document.getElementById("theme");
+  function label() {
+    btn.setAttribute("aria-label", document.documentElement.classList.contains("dark") ? "Switch to light" : "Switch to dark");
+  }
+  label();
+  btn.addEventListener("click", function () {
+    var dark = document.documentElement.classList.toggle("dark");
+    try { localStorage.setItem("markov-theme", dark ? "dark" : "light"); } catch (e) {}
+    label();
+    draw && draw.reset();
+  });
+
+  /* ── sample tape (illustrative, devnet-shaped) ────────── */
+  var TAPE = [
+    { t: "14:02", action: "hedge SOL-PERP", qty: "+12.0", result: "allowed" },
+    { t: "14:04", action: "increase SOL",   qty: "+40.0", result: "blocked", reason: "OverTxCap" },
+    { t: "14:11", action: "skip",           qty: "—",     result: "skip" },
+    { t: "14:18", action: "flatten",        qty: "0.0",   result: "allowed" },
+    { t: "14:26", action: "hedge SOL-PERP", qty: "+8.5",  result: "allowed" }
+  ];
+
+  function rowEl(r, animate) {
+    var li = document.createElement("li");
+    if (animate) li.className = "tape-in";
+    var res = r.result === "blocked" ? r.reason : r.result;
+    var cls = r.result === "blocked" ? "refuse" : r.result === "allowed" ? "allow" : "subtle";
+    li.innerHTML =
+      '<span class="subtle">' + r.t + "</span>" +
+      '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + r.action + "</span>" +
+      '<span class="qty">' + r.qty + "</span>" +
+      '<span class="res ' + cls + '">' + res + "</span>";
+    return li;
+  }
+
+  var tape = document.getElementById("tape");
+  var shown = 0;
+  function revealAll() { tape.innerHTML = ""; TAPE.forEach(function (r) { tape.appendChild(rowEl(r, false)); }); shown = TAPE.length; }
+  function revealNext() {
+    if (shown >= TAPE.length) return false;
+    tape.appendChild(rowEl(TAPE[shown], true));
+    shown++;
+    return true;
+  }
+  if (reduced) { revealAll(); }
+  else {
+    revealNext();
+    var iv = setInterval(function () { if (!revealNext()) clearInterval(iv); }, 700);
+  }
+
+  /* "Watch a refusal" replays the tape and stops on the blocked row */
+  document.getElementById("watch-refusal").addEventListener("click", function () {
+    tape.innerHTML = ""; shown = 0;
+    if (reduced) { revealAll(); return; }
+    var i = setInterval(function () {
+      var more = revealNext();
+      var last = TAPE[shown - 1];
+      if (last && last.result === "blocked") { clearInterval(i); setTimeout(function () { var j = setInterval(function () { if (!revealNext()) clearInterval(j); }, 700); }, 1200); }
+      else if (!more) clearInterval(i);
+    }, 450);
+    document.getElementById("blotter").scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+  });
+
+  /* ── marquee ──────────────────────────────────────────── */
+  var mq = document.getElementById("marquee");
+  var loop = TAPE.concat(TAPE, TAPE);
+  loop.forEach(function (r) {
+    var s = document.createElement("span");
+    s.className = "row";
+    var res = r.result === "blocked" ? r.reason : r.result;
+    var cls = r.result === "blocked" ? "refuse" : r.result === "allowed" ? "allow" : "subtle";
+    s.innerHTML = '<span class="subtle">' + r.t + '</span><span>' + r.action + '</span><span class="' + cls + '">' + res + "</span>";
+    mq.appendChild(s);
+  });
+
+  /* ── ambient tape canvas ──────────────────────────────── */
+  var draw = null;
+  (function canvasTape() {
+    if (reduced) return;
+    var el = document.getElementById("tape-canvas");
+    if (!el) return;
+    var ctx = el.getContext("2d");
+    if (!ctx) return;
+
+    function tok(name, fallback) {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return v || fallback;
+    }
+    var ink, allow, refuse;
+    function readTokens() {
+      ink = tok("--mk-fg", "#161513");
+      allow = tok("--mk-allow", "#2c6b48");
+      refuse = tok("--mk-refuse", "#a33b32");
+    }
+    readTokens();
+
+    var dots = Array.from({ length: 40 }, function () {
+      return {
+        x: Math.random(), y: Math.random(),
+        v: 0.0004 + Math.random() * 0.001,
+        kind: Math.random() < 0.12 ? 2 : (Math.random() < 0.5 ? 1 : 0),
+        r: 1 + Math.random() * 1.6
+      };
+    });
+    var trace = new Array(80).fill(0.5);
+    var phase = 0, raf = 0;
+
+    function size() {
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var w = el.clientWidth, h = el.clientHeight;
+      el.width = w * dpr; el.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    size();
+    var ro = new ResizeObserver(size); ro.observe(el);
+
+    function frame() {
+      var w = el.clientWidth, h = el.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.strokeStyle = ink; ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.06;
+      for (var i = 0; i < 8; i++) {
+        var y = (h / 8) * i;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+      var mid = h * 0.52;
+      ctx.globalAlpha = 0.12;
+      ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+
+      phase += 0.03;
+      trace.push(0.5 + Math.sin(phase) * 0.12 + Math.sin(phase * 0.37) * 0.06);
+      trace.shift();
+
+      ctx.globalAlpha = 0.45; ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      trace.forEach(function (t, i) {
+        var x = (i / (trace.length - 1)) * w;
+        var y = mid + (t - 0.5) * h * 0.7;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      dots.forEach(function (d) {
+        d.x += d.v;
+        if (d.x > 1.05) { d.x = -0.05; d.y = Math.random(); d.kind = Math.random() < 0.12 ? 2 : (Math.random() < 0.5 ? 1 : 0); }
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = d.kind === 2 ? refuse : d.kind === 1 ? allow : ink;
+        ctx.beginPath(); ctx.arc(d.x * w, d.y * h, d.r, 0, Math.PI * 2); ctx.fill();
+      });
+
+      ctx.globalAlpha = 1;
+      raf = requestAnimationFrame(frame);
+    }
+    frame();
+    draw = { reset: readTokens };
+  })();
+})();
+</script>
+</body>
+</html>
