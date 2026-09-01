@@ -35,3 +35,5 @@ Either way P01 must prove, with output pasted into FACTS: `anchor build` of an e
 ## Consequences
 
 `Anchor.toml [toolchain]`, `rust-toolchain.toml` and CI agree on one set. A developer machine that differs is a bug report. `docs/FACTS.md` rows `ANCHOR_VERSION`, `LITESVM_VERSION`, `RUST_VERSION` move from PENDING to values only after the P01 build passes.
+
+**Observed 2026-09-01, applies to both options:** anchor-cli manages the Solana release itself. Every `anchor` invocation re-initialises `~/.local/share/solana/install/active_release` to that Anchor version's default (0.31.1 → Solana 2.1.0, 1.1.2 → 3.1.10) unless `Anchor.toml` carries `[toolchain] solana_version = "<pin>"`. So the pin is not optional, `anchor` must never be run outside the project in CI, and `solana --version` in FACTS must be recorded from inside the project after the pin exists. Both 0.31.1 and 1.1.2 are installed here (`avm use` switches); 4.2.2 is the active Solana release again.
