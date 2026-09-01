@@ -23,3 +23,6 @@ Source: `markovhq.grok.me`, fetched 31 August 2026 (HTML + `assets/styles-*.css`
 
 ## Deploy
 Static. `vercel deploy landing/` or any host. Nav links point at `/book`, `/receipts`, `/paper`, which exist once `P11` ships; until then they 404 and that is fine on a preview, not on the recorded tape.
+
+## v0.2 note (31 Aug 2026)
+Blotter third tile aligned to `13-FRONTEND-SPEC` (`funding 7d`, not `funded`). Sample numbers stay illustrative. `HLP` / `JLP` comparison labels stay; venue brands stay out of shipped copy.

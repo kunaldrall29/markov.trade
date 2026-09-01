@@ -28,6 +28,7 @@ Deposit USDC-d. A house agent runs a bounded book against a mock perp venue. The
 
 - **Verify first.** Never assert a version, API shape, program ID, account layout, or endpoint from memory. Read the source, run the command, dump the IDL, or fetch the docs. Do at least 3–4 independent checks before implementing anything non-trivial.
 - **`docs/FACTS.md` is the source of truth.** Read it before coding. Update it, with a date and the command or URL you used, on every new verification.
+- **solana.new is not a source of truth.** Founder-mode Idea/Build/Launch/Raise may draft copy later. It does not invent program IDs, does not hold keys, and does not close Gate B.
 - **Pre-flight gate.** Each prompt lists checks that must pass before you write code. **If a pre-flight check fails: STOP and report what failed.** Do not improvise around it, do not substitute an assumption, do not "temporarily" hardcode. A failed gate produces a written decision (an ADR), not a workaround.
 - **Self-validate.** After implementing, run the acceptance list yourself and paste real output — test names, signatures, curl responses. "Should work" is not evidence.
 - **Evidence.** Every task ends with: what you ran, what it printed, what you wrote to FACTS, and what you did **not** verify.

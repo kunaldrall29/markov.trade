@@ -1,6 +1,6 @@
 # 07 — Technical Architecture
-Markov Book · 31 August 2026 · v0.1
-Binding for Gate B. Supersedes nothing in `02-TECHNICAL-DECISIONS.md`; it implements it.
+Markov Book · 31 August 2026 · v0.2
+Binding for Gate B. Implements `02-TECHNICAL-DECISIONS.md`. Gate order matches `10-PROGRAM-SPEC.md`.
 
 ---
 
@@ -110,11 +110,11 @@ sequenceDiagram
   alt guard vetoes
     G-->>X: Veto(reason)
     X-->>X: log veto, no tx (unless redteam tick)
-    Note over X: refusal is recorded off-chain as a proposal;<br/>only scheduled redteam ticks force it on chain
+    Note over X: refusal is recorded off-chain as a proposal<br/>only scheduled redteam ticks force it on chain
   else guard allows
     G-->>X: Allow(Intent)
     X->>P: execute_venue_action(intent, args)
-    P->>P: gate order 1..12
+    P->>P: gate order 1..14
     alt a gate fails
       P-->>I: RefusalReceipt{reason, strategy_id}
     else all gates pass
@@ -133,38 +133,44 @@ sequenceDiagram
 
 Evaluated in this order inside `execute_venue_action`. First failure short-circuits, emits a `RefusalReceipt`, and returns `Ok(())` so the receipt is durable rather than rolled back with the transaction.
 
+This list is the same list as `10-PROGRAM-SPEC.md` §3. If they drift, the program spec wins and this file is patched the same day.
+
 ```mermaid
 flowchart TD
-  A["execute_venue_action"] --> G1{"global halt?"}
+  A["execute_venue_action"] --> G1{"1 global halt?"}
   G1 -- yes --> R1["GlobalHalt"]
-  G1 -- no --> G2{"state = Active?"}
+  G1 -- no --> G2{"2 state = Active?"}
   G2 -- Paused --> R2["Paused"]
   G2 -- Revoked --> R3["Revoked"]
   G2 -- Expired --> R4["Expired"]
-  G2 -- yes --> G3{"signer = mandate.operator?"}
+  G2 -- yes --> G3{"3 signer = mandate.operator?"}
   G3 -- no --> R5["NotOperator"]
-  G3 -- yes --> G4{"venue in policy.venues?"}
-  G4 -- no --> R6["VenueNotAllowed"]
-  G4 -- yes --> G5{"mint in policy.tokens?"}
-  G5 -- no --> R7["TokenNotAllowed"]
-  G5 -- yes --> G6{"amount <= per_tx_cap?"}
-  G6 -- no --> R8["OverTxCap"]
-  G6 -- yes --> G7{"day_used + amount <= daily_cap?"}
-  G7 -- no --> R9["OverDailyCap"]
-  G7 -- yes --> G8{"spend within call and daily budget?"}
-  G8 -- no --> R10["OverSpendCap / OverSpendDailyCap"]
-  G8 -- yes --> G9{"slippage <= max_slippage_bps?"}
-  G9 -- no --> R11["SlippageExceeded"]
-  G9 -- yes --> G10{"mark age <= max_age_slots?"}
-  G10 -- no --> R12["StaleOracle"]
-  G10 -- yes --> CPI["CPI into venue, mandate PDA signs"]
-  CPI -- venue error --> R13["VenueRejected"]
-  CPI -- ok --> POST{"post-checks: vault delta, position delta"}
-  POST -- fail --> R14["PostCheckFailed"]
+  G3 -- yes --> G4{"4 intent_id new this day?"}
+  G4 -- no --> R6["DuplicateIntent"]
+  G4 -- yes --> G5{"5 venue in policy AND registry?"}
+  G5 -- no --> R7["VenueNotAllowed"]
+  G5 -- yes --> G6{"6 mint in policy.tokens?"}
+  G6 -- no --> R8["TokenNotAllowed"]
+  G6 -- yes --> G7{"7 action in allowed_actions?"}
+  G7 -- no --> R9["ActionNotAllowed"]
+  G7 -- yes --> G8{"8 amount <= per_tx_cap?"}
+  G8 -- no --> R10["OverTxCap"]
+  G8 -- yes --> G9{"9 day_used + amount <= daily_cap?"}
+  G9 -- no --> R11["OverDailyCap"]
+  G9 -- yes --> G10{"10 spend within call and daily?"}
+  G10 -- no --> R12["OverSpendCap / OverSpendDailyCap"]
+  G10 -- yes --> G11{"11 slippage <= max_slippage_bps?"}
+  G11 -- no --> R13["SlippageExceeded"]
+  G11 -- yes --> G12{"12 mark age <= max_age_slots?"}
+  G12 -- no --> R14["StaleOracle"]
+  G12 -- yes --> CPI["CPI into venue, mandate PDA signs"]
+  CPI -- venue error --> R15["13 VenueRejected"]
+  CPI -- ok --> POST{"14 post-checks: vault delta, position delta"}
+  POST -- fail --> R16["PostCheckFailed — hard Err, revert"]
   POST -- ok --> OK["ActionReceipt"]
 ```
 
-**Receipt durability rule.** A refusal must not be an `Err` that unwinds the transaction, or there is no log to index. Gates return early and emit; only unrecoverable states (bad account layout, wrong program ID, missing signer) return a hard `Err`. This is the single most important implementation detail in the program and it gets its own test in `P02`.
+**Receipt durability rule.** A refusal must not be an `Err` that unwinds the transaction, or there is no log to index. Gates 1–13 return early and emit; only unrecoverable states (bad account layout, wrong program ID, missing signer) and **post-check failure after CPI** return a hard `Err`. This is the single most important implementation detail in the program and it gets its own test in `P02`.
 
 ## 7. Mandate state machine
 
@@ -207,12 +213,12 @@ flowchart LR
 `chainReady` is **not** a boolean someone sets. It is computed:
 
 ```
-chainReady = (rpc_slot_confirmed - last_indexed_slot) <= LAG_SLOTS   // default 150 (~60s)
+chainReady = (rpc_slot_confirmed - last_indexed_slot) <= LAG_SLOTS
           && (now - last_successful_ingest) < 30s
-          && parity_ok                                              // last parity run matched
+          && parity_ok
 ```
 
-If any term is false, `/health` returns `chainReady: false` with the failing term named. The page shows a degraded chip instead of stale counters. An honest "indexer behind by 412 slots" is a better surface than a confident wrong number.
+`LAG_SLOTS` default is 150. Convert that to wall-clock from the **measured devnet slot time** written in FACTS. Do not print “≈60s” until that measurement exists. If any term is false, `/health` returns `chainReady: false` with the failing term named. The page shows a degraded chip instead of stale counters. An honest "indexer behind by 412 slots" is a better surface than a confident wrong number.
 
 ## 9. Deployment topology
 
@@ -266,6 +272,8 @@ flowchart TB
 
 No message queue. No Kafka. No microservice mesh. No Redis. No separate auth service — there are no accounts, the wallet is the identity. No websocket push to the browser for Gate B; a 5-second poll on a single page beats a socket you have to operate. Adding any of these before Gate B is scope leak and gets the `out-of-scope` label.
 
+`solana.new` founder mode is also absent. It does not generate this program, does not hold a key, and does not close a Gate B item.
+
 ## 12. Latency and load budget
 
 One strategy, tens of mandates, a 60-second tick. This is a small system and should be built like one.
@@ -282,7 +290,7 @@ One strategy, tens of mandates, a 60-second tick. This is a small system and sho
 
 Three interfaces exist purely so the real-venue spike in Gate C is a new implementation and not a rewrite:
 
-1. `VenueAdapter` trait — `demo_perps` and any future venue implement identically (§ `10-PROGRAM-SPEC` and `11-AGENT-SPEC`).
+1. `VenueAdapter` trait — `demo_perps` and any future venue implement identically (`10-PROGRAM-SPEC` and `11-AGENT-SPEC`).
 2. `MarkSource` trait — the paper runner, the devnet mark poster, and a future venue oracle all satisfy it.
 3. `ReceiptSink` — the indexer reads events by IDL, not by string matching, so a program upgrade that adds a field does not break ingestion.
 

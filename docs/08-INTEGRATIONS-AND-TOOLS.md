@@ -1,9 +1,16 @@
 # 08 — Integrations and Tools
-Markov Book · 31 August 2026 · v0.1
+Markov Book · 31 August 2026 · v0.2
 
 Everything the system touches. Three columns matter: **why it exists**, **is it required for Gate B**, and **what has to be verified before a line of code depends on it**.
 
 Verification rule: no version, program ID, or endpoint in this file is authoritative. Each one carries a `FACTS key`. Week 0 verifies it, writes the resolved value with a date and a source into `docs/FACTS.md`, and code reads it from there. If a verification fails, stop and report — do not substitute a guess.
+
+Observed-as-of 31 August 2026 (not pins):
+
+- Anchor latest published tag seen: **v1.1.2** (26 Jun 2026). v1.0.0 shipped 2 Apr 2026 as the first stable major. Recommended Solana/Agave with 1.0/1.1 docs: **3.1.10**.
+- `@solana/kit` latest tag seen: **v8.1.0** (27 Aug 2026).
+- Pyth Core SVM cutover: **26 Aug 2026, 16:00 UTC**. Hermes requires an API key after that date.
+- `pyth-solana-receiver-sdk` published Anchor compat: **0.28.0, 0.29.0, 0.30.1, 0.31.1** — not 1.x.
 
 ---
 
@@ -12,13 +19,13 @@ Verification rule: no version, program ID, or endpoint in this file is authorita
 | Tool | Role | Gate B | Verify in Week 0 | FACTS key |
 |---|---|---|---|---|
 | Solana **devnet** | the only cluster | required | cluster health, faucet limits, devnet USDC-d mint we will use | `CLUSTER`, `USDC_D_MINT` |
-| **Anchor** | program framework, IDL, event codecs | required | exact version; Anchor v1.0.0 shipped 2 Apr 2026 as the first stable major, v1.0.1 is a patch — pin one and record it | `ANCHOR_VERSION` |
-| **Agave / solana CLI** | keygen, deploy, program dump | required | version compatible with the pinned Anchor; note Anchor v1.0 removed the hard Solana CLI dependency, but deploys and keygen still want it | `SOLANA_CLI_VERSION` |
+| **Anchor** | program framework, IDL, event codecs | required | `anchor --version`. Pin the printed version in `Anchor.toml [toolchain]`. Do not type 1.0.0 from memory | `ANCHOR_VERSION` |
+| **Agave / solana CLI** | keygen, program dump, explorer-shaped commands | required | version compatible with the pinned Anchor. Anchor 1.x removed the hard Solana CLI *dependency* for common subcommands; dumps and keygen still want a CLI | `SOLANA_CLI_VERSION` |
 | **Rust toolchain** | programs + all services | required | pinned in `rust-toolchain.toml`; must build SBF for the pinned Agave | `RUST_VERSION` |
-| **LiteSVM** | fast in-process program tests | required | it is an Anchor v1.0 default test target; confirm the crate version that matches | `LITESVM_VERSION` |
-| **Surfpool** | local validator / mainnet-fork daemon, Anchor v1.0 default | recommended | whether it is needed at all for a devnet-only, mock-venue build; if it only duplicates LiteSVM, skip it | `SURFPOOL_VERSION` |
+| **LiteSVM** | in-process program unit tests | required | crate version that builds against the pinned Anchor. This is the P02 acceptance harness | `LITESVM_VERSION` |
+| **Surfpool** | default `anchor test` / `anchor localnet` runner (local SVM, optional mainnet fork) | optional for Gate B | **not a LiteSVM duplicate.** LiteSVM = unit. Surfpool = integration runner. Skip Surfpool only if all program tests run in-process on LiteSVM and no fork is needed | `SURFPOOL_VERSION` |
 | **AVM** | Anchor version manager | recommended | install path in CI | — |
-| **Codama** | generate the TS client from the IDL | required for web | generator version and that it emits a Kit-compatible client | `CODAMA_VERSION` |
+| **Codama** | generate the TS client from the IDL (`@codama/renderers-js` → Kit) | required for web | generator version and that it emits a Kit-compatible client | `CODAMA_VERSION` |
 
 **Pinned-toolchain rule.** `Anchor.toml [toolchain]`, `rust-toolchain.toml`, and the CI image agree on one set of versions. A developer machine that differs is a bug report, not a workaround.
 
@@ -26,8 +33,8 @@ Verification rule: no version, program ID, or endpoint in this file is authorita
 
 | Tool | Role | Gate B | Note |
 |---|---|---|---|
-| **`@solana/kit`** | JS/TS SDK for the web app | required | Kit is the successor to `@solana/web3.js` v2; new apps build directly on Kit. Verify the current major before pinning. |
-| **`@solana/kit-plugin-wallet`** | Wallet Standard discovery | required | Kit does **not** use `@solana/wallet-adapter`; wallet-adapter is superseded for new work. Do not pull in the legacy adapter bundle. |
+| **`@solana/kit`** | JS/TS SDK for the web app | required | Successor to `@solana/web3.js` v1. New apps build directly on Kit. Verify the current major before pinning (`KIT_VERSION`) |
+| **`@solana/kit-plugin-wallet`** | Wallet Standard discovery | required | Kit does **not** use `@solana/wallet-adapter`. Do not pull in the legacy adapter bundle |
 | **`@solana/react`** | React bindings / hooks over the Kit client | required | |
 | **`@solana/web3.js` v1 or v3-rc** | legacy interop | **not used** | only relevant if a dependency forces it; if one does, record why in FACTS |
 
@@ -37,10 +44,10 @@ Verification rule: no version, program ID, or endpoint in this file is authorita
 
 | Tool | Role | Gate B | Verify |
 |---|---|---|---|
-| **Pyth Hermes** (off-chain) | pull the SOL/USD price payload for marking | required | current Hermes endpoint, the SOL/USD feed id, and the rate limit |
-| **Pyth Solana receiver / price feed accounts** | on-chain mark for `demo_perps` freshness checks | required | Pyth Core on Solana had an upgrade dated 18 Aug 2026 — confirm the **current** receiver and price-feed program addresses and whether devnet is on the upgraded contracts before hardcoding anything |
-| **`pyth-solana-receiver-sdk`** (Rust) | read a price update inside the program | required if reading Pyth directly on-chain | **known integration risk:** published compatibility has trailed Anchor releases (documented as compatible up to 0.31.1 at time of writing). If it does not build against the pinned Anchor v1.x, use the fallback below and record the decision. |
-| **Fallback: house `mark-poster` + `MarkAccount`** | a tiny signed-by-us mark account with `price`, `expo`, `slot`, `source` | required as fallback | keeps the *freshness gate real* even if the SDK is not compatible. Clearly labelled on the dashboard as a house-posted devnet mark, not an oracle claim. |
+| **Pyth Hermes** (off-chain) | pull the SOL/USD price payload for marking | required *or* skipped if `MARK_SOURCE=house` | current Hermes URL, API key issuance, SOL/USD feed id, rate limit. Post-26-Aug-2026: unauthenticated calls fail |
+| **Pyth Solana receiver / price feed accounts** | on-chain mark for `demo_perps` freshness checks | only if the SDK builds | Receiver program observed: `rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ`. Price-feed program observed: `pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT`. Confirm on **devnet** before hardcoding. Keys: `PYTH_RECEIVER_PROGRAM`, `PYTH_PRICE_FEED_PROGRAM` |
+| **`pyth-solana-receiver-sdk`** (Rust) | read a price update inside the program | only if it compiles on the pinned Anchor | Published compat stops at Anchor **0.31.1**. On Anchor 1.x this is expected to fail. Do not spend a day forcing it |
+| **Fallback: house `mark-poster` + `MarkAccount`** | signed-by-us mark account with `price`, `expo`, `slot`, `source` | **expected path on Anchor 1.x** | keeps the freshness gate real. Labelled on the dashboard as a house-posted devnet mark, not an oracle claim. Decision recorded as ADR-013 when P04 runs |
 
 **Why the fallback is acceptable and how to say it honestly:** devnet money is fake and the venue is a mock. A house-posted mark is fine *as long as the page says so* and the freshness gate is genuinely enforced on-chain. It becomes unacceptable the moment real capital or a real venue appears — that is a Gate C blocker, written into `SECURITY.md` now.
 
@@ -78,11 +85,11 @@ Verification rule: no version, program ID, or endpoint in this file is authorita
 
 | Tool | Role | Gate B | Note |
 |---|---|---|---|
-| **TanStack Start (Vite + TanStack Router, SSR)** | web app framework | required | chosen to match the existing design source at `markovhq.grok.me`, which is a TanStack Start app — the design ports 1:1 instead of being re-derived |
-| **Tailwind CSS v4** | styling | required | the reference stylesheet uses v4 tokens (`--color-*` theme vars, `bg-linear-to-b`); staying on v4 keeps class names identical |
+| **TanStack Start (Vite + TanStack Router, SSR)** | web app framework | required | chosen to match the existing design source at `markovhq.grok.me` |
+| **Tailwind CSS v4** | styling | required | the reference stylesheet uses v4 tokens (`--color-*` theme vars, `bg-linear-to-b`) |
 | **Google Fonts: Outfit + JetBrains Mono** | display/body + data | required | exactly the two families the reference loads |
 | **lucide-react** | the few icons used | required | reference uses it (moon icon) |
-| **zustand** | tiny client store for the blotter | optional | reference uses a small store; local state is fine |
+| **zustand** | tiny client store for the blotter | optional | local state is fine |
 
 ## 8. Quality, safety, and truth tooling
 
@@ -92,15 +99,15 @@ Verification rule: no version, program ID, or endpoint in this file is authorita
 | `cargo deny` | dependency licence + advisory check | required |
 | `cargo audit` | RustSec advisories | required |
 | `eslint` + `prettier` + `tsc --noEmit` | web | required |
-| `anchor test` (LiteSVM) | program invariants | required |
-| **`scripts/copy-grep.sh`** | B15 enforcement — fails CI if banned words appear in built HTML | required |
+| `anchor test` via LiteSVM (and Surfpool only if used) | program invariants | required |
+| **`scripts/copy-grep.sh`** | B15 enforcement — fails CI if banned claims appear in built HTML | required |
 | **`scripts/parity-check`** | independent chain count vs API count | required |
-| **`scripts/gate-b-verify.sh`** | runs the whole freeze list against hosted URLs and prints red/green | required |
+| **`scripts/gate-b-verify.sh`** | runs the freeze list against hosted URLs and prints red/green | required |
 | Playwright | one UI test: withdraw enabled in Active/Paused/Revoked (B10) | required |
 | Sentry or equivalent | error tracking for agent + indexer + api + web | recommended |
 | Uptime monitor | pings `/health` and `/book` | recommended |
 
-**`copy-grep` banned list (Gate B):** `APY`, `%\s*APY`, `annualized`, `guaranteed`, `risk-free`, `audited`, `Jupiter`, `Drift`, `Velocity`, `Pacifica`, `Hyperliquid`, `mainnet`, `all eleven`. Allowed only inside `docs/` and code comments; a hit in built HTML fails the job. Venue brands are banned in **public copy** until the ADR-03 Week-0 checklist passes for that venue, which cannot happen in Gate B.
+**`copy-grep` banned list (Gate B):** promised-rate patterns, APY/APR framed as earned, `annualized`, `guaranteed`, `risk-free`, “is/been audited”, `mainnet`, named venues (`jupiter`, `drift`, `velocity`, `pacifica`, `hyperliquid`), `all eleven`. Allowed only inside `docs/` and code comments; a hit in built HTML fails the job. Comparison labels `HLP` and `JLP` on the landing “Not that” grid are allowed — they are not venue-integration claims. Venue brands stay banned in public copy until the ADR-03 Week-0 checklist passes, which cannot happen in Gate B.
 
 ## 9. Explicitly not integrated (and why)
 
@@ -111,14 +118,13 @@ Verification rule: no version, program ID, or endpoint in this file is authorita
 | Any token, points, or leaderboard | ADR-05 non-goals |
 | x402 facilitator settlement | ADR-11 defers it; spend caps exist in-program without it |
 | MCP server | side tool at best; not the MVP (`03-MVP-DEVNET` §8) |
+| solana.new founder mode | Idea/Build/Launch/Raise is a side generator. It does not own FACTS, keys, or Gate B |
 | Redis / queue / websockets to the browser | no load justifies them; a 5s poll meets the 10s requirement |
 | Wallet-adapter legacy bundle | superseded by Kit + Wallet Standard; pulls deprecated transitive deps |
 | An LLM anywhere near signing | ADR-04 |
 | Analytics that track wallets | there is no reason to profile a depositor to close Gate B |
 
 ## 10. Accounts and access to open in Week 0
-
-A boring list that blocks everything if it is late:
 
 1. RPC provider account with a devnet plan and a WebSocket endpoint.
 2. Railway project `markov-devnet` with six services and one Postgres.
@@ -127,7 +133,7 @@ A boring list that blocks everything if it is late:
 5. Telegram bot token from BotFather, plus the chat/user allowlist for `/pause` and `/revoke`.
 6. Three keypairs generated on a machine that is not CI: `owner-demo`, `operator`, `emergency`. Public keys go into FACTS; private keys go into service env only.
 7. Error-tracking project (one DSN per service).
-8. Price source access confirmed (endpoint reachable, feed id resolved).
+8. Price source access confirmed (Hermes reachable **with API key**, or an explicit `MARK_SOURCE=house` decision). Feed id resolved.
 
 ## 11. Cost sketch (devnet, monthly, order of magnitude)
 
@@ -138,6 +144,7 @@ A boring list that blocks everything if it is late:
 | Vercel hobby/pro | free to low tens |
 | Domain | annual, negligible monthly |
 | Error tracking | free tier |
-| **Total** | **tens of dollars a month** — Gate B is not an infrastructure problem |
+| Pyth Hermes | confirm current plan; do not assume the public URL is still free |
+| **Total** | **tens of dollars a month** unless a price-data plan is required — Gate B is not an infrastructure problem |
 
 Devnet SOL is free from the faucet; budget a top-up runbook anyway, because an agent that cannot pay fees looks exactly like a broken agent.

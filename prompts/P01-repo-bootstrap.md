@@ -5,7 +5,7 @@ Seat: Protocol · Window: 31 Aug – 2 Sep · Inherits `P00-conventions.md`
 A monorepo that builds, lints, tests, and deploys nothing yet — but where every later prompt has a place to put its code and a CI job that will catch it failing.
 
 ## Pre-flight (STOP and report if any fails)
-1. `anchor --version`, `solana --version`, `rustc --version`, `node -v`, `pnpm -v` all print, and the Anchor and Agave versions are compatible with each other. Record all five in FACTS.
+1. `anchor --version`, `solana --version`, `rustc --version`, `node -v`, `pnpm -v` all print, and the Anchor and Agave versions are compatible with each other. Record all five in FACTS. Do not type Anchor 1.0.0 from this pack. Observed-as-of 31 Aug 2026: Anchor tag 1.1.2, docs recommend Agave 3.1.10 — the machine is still the source.
 2. `solana config get` shows devnet, and `solana balance` on a fresh keypair funds from the faucet.
 3. The **existing deployed `markov-mandate` program** can be found: `solana program show <id>` returns, and you can dump its IDL. If the program ID is unknown, STOP — that ID is a Week-0 input, not something to invent.
 4. `anchor init` scaffolding builds an empty program with the pinned toolchain.

@@ -1,5 +1,5 @@
 # 15 — Testing, CI, Observability
-Markov Book · 31 August 2026 · v0.1
+Markov Book · 31 August 2026 · v0.2
 
 Gate B is a claim about a running system, so the tests are mostly about states that must remain possible (withdraw) and states that must remain impossible (operator withdraw, silent refusal).
 
@@ -11,7 +11,7 @@ Gate B is a claim about a running system, so the tests are mostly about states t
 |---|---|---|---|
 | Pure unit | `cargo test` | guard rules, core proposer, policy tighten-diff, day rollover math | every push |
 | Fixture | `cargo test` + `crates/markov-guard/src/fixtures/*.json` | one file per veto reason + one allow | every push |
-| Program | LiteSVM (Anchor v1 default) | every gate, every state transition, receipt durability | every push |
+| Program | LiteSVM (in-process unit) | every gate, every state transition, receipt durability | every push |
 | Property | `proptest` | tighten-only never widens; caps never overflow; `owner_withdraw` succeeds for any state and any balance ≤ vault | nightly + pre-merge |
 | Integration | devnet script | fund → act → refuse → revoke → withdraw against real hosts | on `main`, nightly |
 | E2E | Playwright | B10 withdraw-enabled matrix; the tape beats; explorer links resolve | on PR preview |

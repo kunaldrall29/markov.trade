@@ -1,5 +1,5 @@
 # 16 — Gate B Traceability
-Markov Book · 31 August 2026 · v0.1
+Markov Book · 31 August 2026 · v0.2
 
 Every freeze-list item mapped to the component that satisfies it, the test that proves it, the artifact a stranger can open, and the FACTS key that records it. One red = Gate B open.
 

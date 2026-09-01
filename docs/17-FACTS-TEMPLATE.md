@@ -1,5 +1,5 @@
 # 17 — `docs/FACTS.md` template
-Markov Book · 31 August 2026 · v0.1
+Markov Book · 31 August 2026 · v0.2
 
 FACTS is the single source of truth for versions, IDs, and decoded shapes. Rules:
 
@@ -17,12 +17,12 @@ Last full verification: <date>   Verified by: <seat>
 ## Cluster and toolchain
 | Key | Value | Verified | Source |
 | CLUSTER | devnet | | |
-| ANCHOR_VERSION | PENDING | | `anchor --version` |
+| ANCHOR_VERSION | PENDING | | `anchor --version` — do not type 1.0.0 from memory. Latest tag observed 31 Aug 2026: 1.1.2 |
 | SOLANA_CLI_VERSION | PENDING | | `solana --version` |
 | RUST_VERSION | PENDING | | `rustc --version` |
 | LITESVM_VERSION | PENDING | | Cargo.lock |
 | CODAMA_VERSION | PENDING | | package.json |
-| KIT_VERSION | PENDING | | package.json (@solana/kit) |
+| KIT_VERSION | PENDING | | package.json (@solana/kit) — latest tag observed 27 Aug 2026: 8.1.0 |
 
 ## Programs and accounts
 | PROGRAM_ID | PENDING | | `solana program show` |
@@ -50,10 +50,13 @@ Last full verification: <date>   Verified by: <seat>
 | MARK_POSTER_PUBKEY | PENDING | | |
 
 ## Price source
-| MARK_SOURCE | PENDING (hermes \| house) | | |
-| HERMES_URL | PENDING | | fetched |
+| MARK_SOURCE | PENDING (hermes \| house) | | house is the expected Gate B path on Anchor 1.x |
+| HERMES_URL | PENDING | | fetched; post-26-Aug-2026 cutover uses keyed Hermes |
+| HERMES_API_KEY | PENDING | | issued; never committed |
 | SOL_USD_FEED_ID | PENDING | | fetched |
-| PYTH_RECEIVER_PROGRAM | PENDING | | docs, post-18-Aug-2026 upgrade — confirm devnet address |
+| PYTH_RECEIVER_PROGRAM | PENDING | | observed rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ — confirm on devnet |
+| PYTH_PRICE_FEED_PROGRAM | PENDING | | observed pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT — confirm on devnet |
+| DEVNET_SLOT_MS | PENDING | | measure; used to translate LAG_SLOTS into wall-clock |
 | MARK_MAX_AGE_SLOTS | PENDING | | policy |
 
 ## Hosts

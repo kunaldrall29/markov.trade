@@ -1,5 +1,5 @@
 # 09 — Repo Structure
-Markov Book · 31 August 2026 · v0.1
+Markov Book · 31 August 2026 · v0.2
 
 One repository. One Cargo workspace for everything that touches a key or a log, one pnpm workspace for everything that renders. Two package managers, no third.
 
@@ -131,7 +131,7 @@ markov-book/
 | `EMERGENCY_KEYPAIR` | bot service only | never in agent |
 | `OWNER_DEMO_KEYPAIR` | demo scripts only | for the recorded tape |
 | `MARK_SOURCE` | agent, paper | `hermes` \| `onchain` \| `replay` |
-| `HERMES_URL`, `SOL_USD_FEED_ID` | agent, paper | from FACTS |
+| `HERMES_URL`, `HERMES_API_KEY`, `SOL_USD_FEED_ID` | agent, paper | from FACTS. Key required after 26 Aug 2026 Pyth cutover. Empty key + `MARK_SOURCE=hermes` must refuse to boot |
 | `TICK_SECONDS` | agent | default 60, floor 60 in Gate B |
 | `REDTEAM_ENABLED`, `REDTEAM_CRON` | agent | off in `shadow` |
 | `DATABASE_URL` | indexer (rw), data-api (ro) | two roles, two URLs |

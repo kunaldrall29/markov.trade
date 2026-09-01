@@ -1,9 +1,12 @@
 # Markov Book — Engineering Pack
-**Date:** 31 August 2026 · v0.1
+**Date:** 31 August 2026 · v0.2
 **Scope:** everything needed to close **Gate B** (27 Sep 2026) and nothing that belongs to Gate C, mainnet, or Phase 3.
-**Inputs:** `00-INDEX` … `06-PMF` planning pack, the Gate B freeze list, and the live design at `markovhq.grok.me`.
+**Inputs:** `00-INDEX` … `06-PMF` planning pack, `GATE-B.md`, the live design at `markovhq.grok.me` (fetched 31 Aug 2026).
+**Supersedes:** engineering pack v0.1. See `CORRECTIONS.md`.
 
-**Rule inherited from the planning pack:** claims here are design intent. Nothing is a live product claim. Every version number, program ID, and API shape below is **to be verified in Week 0 and written into `docs/FACTS.md`** before it is used in code. Where this pack states a fact from the outside world, it is dated and sourced. Where it states a decision, it is labelled a decision.
+**Rule:** claims here are design intent. Nothing is a live product claim. Every version number, program ID, and API shape is **verified in Week 0 and written into `docs/FACTS.md`** before code depends on it. Observed-as-of dates below are not pins.
+
+**solana.new:** founder-mode Idea / Build / Launch / Raise is a side tool. It is not a source of IDs, not a substitute for P02, and not a Gate B dependency.
 
 ---
 
@@ -11,23 +14,24 @@
 
 | # | File | What it answers |
 |---|---|---|
-| 07 | `docs/07-TECH-ARCHITECTURE.md` | What the system is, trust boundaries, gate order, every diagram |
-| 08 | `docs/08-INTEGRATIONS-AND-TOOLS.md` | Every integration and tool, with required / optional / later |
-| 09 | `docs/09-REPO-STRUCTURE.md` | Monorepo tree, package boundaries, env matrix, conventions |
+| — | `CORRECTIONS.md` | What v0.1 got wrong |
+| 07 | `docs/07-TECH-ARCHITECTURE.md` | System, trust boundaries, **unified** gate order, topology |
+| 08 | `docs/08-INTEGRATIONS-AND-TOOLS.md` | Every integration, required / optional / later, Week-0 verify |
+| 09 | `docs/09-REPO-STRUCTURE.md` | Monorepo tree, package boundaries, env matrix |
 | 10 | `docs/10-PROGRAM-SPEC.md` | On-chain: accounts, instructions, gates, BlockReason, adapter ABI |
 | 11 | `docs/11-AGENT-SPEC.md` | `book-one`: sidecar / core / guard / submitter / redteam / paper |
 | 12 | `docs/12-DATA-AND-API-SPEC.md` | Indexer, schema, endpoints, `chainReady`, parity job |
-| 13 | `docs/13-FRONTEND-SPEC.md` | Design system lifted from the live site, `/book` spec, copy rules |
+| 13 | `docs/13-FRONTEND-SPEC.md` | Design system from the live site, `/book` spec, copy rules |
 | 14 | `docs/14-SECURITY-AND-KEYS.md` | Key custody, threat model, `SECURITY.md` template |
 | 15 | `docs/15-TESTING-CI-OBSERVABILITY.md` | Test matrix, CI, metrics, alerts, runbooks |
 | 16 | `docs/16-GATE-B-TRACEABILITY.md` | B1–B15 → component → test → artifact → FACTS key |
-| 17 | `docs/17-FACTS-TEMPLATE.md` | `docs/FACTS.md` skeleton and the verification log format |
+| 17 | `docs/17-FACTS-TEMPLATE.md` | `docs/FACTS.md` skeleton and verification log format |
 
-## Build prompts (one file each, run in order)
+## Build prompts (run in order)
 
 | # | File | Seat | Gate B items |
 |---|---|---|---|
-| P00 | `prompts/P00-conventions.md` | all | preamble every other prompt inherits — read first |
+| P00 | `prompts/P00-conventions.md` | all | preamble — read first |
 | P01 | `prompts/P01-repo-bootstrap.md` | Protocol | scaffold, CI, FACTS |
 | P02 | `prompts/P02-program-core.md` | Protocol | B2 B8 B10-support |
 | P03 | `prompts/P03-venue-adapter-trait.md` | Protocol | B11 |
@@ -46,13 +50,13 @@
 
 ## Working script
 
-`scripts/copy-grep.sh` — B15, written and self-tested against the real page. It is claim-shaped, not token-shaped: `No APY on this page.`, `What's the APY?`, `unaudited`, and `April 2026` all contain banned substrings and are all correct copy, so a naive word list fails the build on the page's own honesty. Verified clean on the landing page, and verified red when `12% APY, guaranteed` or a venue brand is injected.
+`scripts/copy-grep.sh` — B15. Claim-shaped, not token-shaped.
 
 ## Landing page
 
-`landing/index.html` — single-file, no build step, production-deployable. Design tokens, type, motion, and structure taken from `markovhq.grok.me` (fetched 31 Aug 2026). `landing/DESIGN-NOTES.md` records exactly what was lifted and what changed.
+`landing/index.html` — static, tokens and structure from `markovhq.grok.me`. `landing/DESIGN-NOTES.md` records what was lifted.
 
 ## Reading order for a new seat
 
-1. `07` architecture → 2. the spec for your seat (`10`/`11`/`12`/`13`) → 3. `prompts/P00` → 4. your prompt file.
+1. `CORRECTIONS.md` → 2. `07` architecture → 3. the spec for your seat (`10`/`11`/`12`/`13`) → 4. `prompts/P00` → 5. your prompt.
 Nobody writes code before `docs/FACTS.md` has the rows their prompt needs.

@@ -1,11 +1,11 @@
 # P08 — Paper runner (`VENUE=shadow`)
-Seat: Agents · Window: starts 31 Aug, runs to the gate · Inherits `P00-conventions.md`
+Seat: Agents · Window: starts 31 Aug 2026, runs to the gate · Inherits `P00-conventions.md`
 
 ## Goal
 Seven consecutive dated daily files, ugly days kept. This is **B12**, and it starts before anything else is built because days cannot be manufactured later.
 
 ## Pre-flight
-1. A price source responds and returns a slot/timestamp with each price. Record the endpoint and feed id in FACTS.
+1. A price source responds and returns a slot/timestamp with each price. Record the endpoint, feed id, and whether a Hermes API key was required, in FACTS. If Hermes is keyed and we have no key, use a labelled public mark or house replay and say so.
 2. `book-core` and `markov-guard` compile (they can be minimal at first — a paper day with a simple core is worth more than a perfect core with no days).
 3. `PAPER_START_DATE` is empty in FACTS. Once written, it is never edited.
 

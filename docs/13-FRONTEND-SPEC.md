@@ -1,5 +1,5 @@
 # 13 — Frontend Spec
-Markov Book · 31 August 2026 · v0.1
+Markov Book · 31 August 2026 · v0.2
 
 The design already exists at `markovhq.grok.me`. This document records it exactly as fetched on 31 Aug 2026 so it can be rebuilt in the repo without re-deriving anything, then specifies `/book`, which is the page Gate B actually grades.
 

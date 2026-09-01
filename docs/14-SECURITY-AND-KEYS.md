@@ -1,5 +1,5 @@
 # 14 — Security and Keys
-Markov Book · 31 August 2026 · v0.1
+Markov Book · 31 August 2026 · v0.2
 This file is the source for `docs/SECURITY.md` (Gate B item **B13**).
 
 ---
@@ -41,7 +41,7 @@ That is the whole security claim. Everything stronger — "secure", "audited", "
 1. **Single upgrade authority on devnet.** One key can replace the program. Accepted for Gate B because there is no real money and the alternative is theatre. Mainnet requires a multisig and a written freeze plan; that plan is a Phase-1 gate, not a Gate B one.
 2. **No audit.** The program is unaudited. Every page says unaudited.
 3. **Delta, gross, and daily-loss halt are enforced off-chain in v0** (ADR-05). The dashboard labels them. Anyone who believes they are on-chain has been misled, so the label is a correctness requirement, not a decoration.
-4. **The mark is house-posted on devnet** if the oracle SDK does not build against the pinned Anchor. Labelled on the page as a house mark.
+4. **The mark is house-posted on devnet** if the oracle SDK does not build against the pinned Anchor. As of 31 Aug 2026, `pyth-solana-receiver-sdk` is documented only through Anchor 0.31.1, so on an Anchor 1.x pin this is the expected path, not a surprise. Labelled on the page as a house mark.
 5. **`demo_perps` is a mock.** Fills are deterministic and generous compared to a real venue. No PnL number from it is evidence about a real book.
 6. **The Telegram bot holds the emergency key**, so anyone who takes over the bot can stop the book. They cannot take anything. Allowlist the chat ids and treat bot takeover as a pause event, not a loss event.
 

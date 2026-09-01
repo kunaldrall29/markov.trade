@@ -1,5 +1,5 @@
 # 11 — Agent Spec (`book-one`)
-Markov Book · 31 August 2026 · v0.1
+Markov Book · 31 August 2026 · v0.2
 
 One binary. Two modes: `VENUE=devnet` (submits) and `VENUE=shadow` (paper, never touches a key). Same core, same guard, same reason vocabulary — that is the whole reason it is one binary.
 
@@ -148,7 +148,7 @@ Rules: one file per calendar day, written even when the day is boring or bad. A 
 | `TICK_SECONDS` | 60 | hard floor 60 in Gate B; a lower value refuses to boot |
 | `MAX_ACTIONS_PER_HOUR` | 6 | exceeding it halts the agent and pages |
 | `DAILY_LOSS_HALT_BPS` | 500 | 5% |
-| `MARK_MAX_AGE_SLOTS` | 150 | must be ≤ the on-chain policy value |
+| `MARK_MAX_AGE_SLOTS` | 150 | must be ≤ the on-chain policy value. Wall-clock meaning comes from measured devnet slot time in FACTS |
 | `REDTEAM_ENABLED` | false | true only on the devnet agent |
 | `SIDECAR` | `stub` | `stub` returns `chop`; any other value must be declared in FACTS |
 

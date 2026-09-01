@@ -5,8 +5,8 @@ Seat: Protocol · Window: 8–13 Sep · Inherits `P00-conventions.md`
 A mock venue that is honest: it exercises the real trait, enforces mark freshness on chain, holds **zero token custody**, and never flatters the book.
 
 ## Pre-flight (STOP and report if any fails)
-1. Decide the mark path and prove it: try `pyth-solana-receiver-sdk` against the pinned Anchor version. Published compatibility has historically trailed Anchor releases, and Pyth's Solana contracts had an upgrade dated 18 Aug 2026 — so confirm the **current devnet** receiver/price-feed addresses before depending on them.
-2. If the SDK does not build, STOP, write ADR-013 choosing the house `MarkAccount` fallback, and record `MARK_SOURCE=house` in FACTS. Do not silently invent a price.
+1. Decide the mark path and prove it. As of 31 Aug 2026, `pyth-solana-receiver-sdk` is documented compatible with Anchor 0.28–0.31.1 only. Pyth Core SVM cutover was **26 Aug 2026, 16:00 UTC**. Hermes requires an API key. Confirm current **devnet** receiver/price-feed addresses before depending on them (observed receiver `rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ`, price-feed `pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT` — still PENDING until dumped).
+2. If the pinned toolchain is Anchor 1.x, treat SDK failure as expected: STOP, write ADR-013 choosing the house `MarkAccount` fallback, record `MARK_SOURCE=house` in FACTS. Do not spend a day forcing the crate. Do not silently invent a price.
 3. Confirm `demo_perps` can be added to the `Registry` adapter allowlist and to a mandate policy.
 
 ## Deliverables

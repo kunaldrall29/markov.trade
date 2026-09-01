@@ -1,5 +1,5 @@
 # 12 — Data and API Spec
-Markov Book · 31 August 2026 · v0.1
+Markov Book · 31 August 2026 · v0.2
 
 The read plane exists to make chain state legible in under ten seconds. It is a cache. It invents nothing. If Postgres is lost, the whole thing rebuilds from chain, and that rebuild is a tested runbook, not a hope.
 
@@ -107,7 +107,7 @@ Base: `https://api.<domain>` · read-only · public · CORS open for GET · no a
 
 ```
 chainReady = lag_ok && ingest_ok && parity_ok
-lag_ok     = (rpc_slot_confirmed - last_indexed_slot) <= LAG_SLOTS      // default 150
+lag_ok     = (rpc_slot_confirmed - last_indexed_slot) <= LAG_SLOTS      // default 150; wall-clock from FACTS slot time, not an assumed 400ms
 ingest_ok  = now - last_ingest_ok < 30s
 parity_ok  = last parity run matched within tolerance 0
 ```

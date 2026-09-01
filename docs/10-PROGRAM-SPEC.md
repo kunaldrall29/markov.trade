@@ -1,6 +1,7 @@
 # 10 — Program Spec
-Markov Book · 31 August 2026 · v0.1
+Markov Book · 31 August 2026 · v0.2
 Covers `markov-mandate` and `demo-perps`. Anchor. Devnet only.
+Gate order in §3 is binding. `07-TECH-ARCHITECTURE.md` §6 must match it.
 
 > **Reconciliation notice.** A `markov-mandate` program already exists on devnet with a receipt model and a `BlockReason` set that Gate B requires to remain intact ("all eleven historical BlockReasons still exist"). This spec is written as a **delta**. Before writing code, dump the deployed IDL, extract the exact enum discriminants and account layouts, and record them in `docs/FACTS.md`. If anything below conflicts with the deployed program, the deployed program wins and this file gets an ADR amendment. Never renumber a discriminant that has been emitted.
 
