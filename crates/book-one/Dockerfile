@@ -19,5 +19,6 @@ ENV VENUE=shadow \
     MARK_SOURCE=onchain \
     PAPER_DIR=/data/paper \
     RUST_LOG=info
-VOLUME ["/data/paper"]
+# No VOLUME instruction: Railway rejects it ("use Railway Volumes"); the paper
+# directory is a Railway volume mounted at /data/paper in the service config.
 ENTRYPOINT ["/usr/local/bin/book-one"]
