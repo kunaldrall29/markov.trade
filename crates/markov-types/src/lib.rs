@@ -1,0 +1,136 @@
+//! Types shared by the programs and the services. Must compile for SBF and host.
+//!
+//! `BlockReason` is append-only. Discriminants 0–10 are exactly what the
+//! deployed predecessor `5o8E…` emitted on devnet (decoded from 20 on-chain
+//! `ActionRefused` payloads, `docs/FACTS.md`); 11–16 are appended for Gate B in
+//! the order fixed by ADR-004. Never rename, reorder, or reuse a variant.
+#![forbid(unsafe_code)]
+#![warn(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![no_std]
+
+/// Machine-readable refusal reason. Discriminant = on-chain byte.
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum BlockReason {
+    OverTxCap = 0,
+    OverDailyCap = 1,
+    OverSpendCap = 2,
+    OverSpendDailyCap = 3,
+    ProgramNotAllowed = 4,
+    TokenNotAllowed = 5,
+    SlippageExceeded = 6,
+    Expired = 7,
+    Paused = 8,
+    Revoked = 9,
+    Unauthorized = 10,
+    // appended in Gate B (ADR-004); order is final once first emitted
+    StaleOracle = 11,
+    ActionNotAllowed = 12,
+    DuplicateIntent = 13,
+    GlobalHalt = 14,
+    VenueRejected = 15,
+    PostCheckFailed = 16,
+}
+
+impl BlockReason {
+    /// Every variant, in discriminant order. The append-only test reads this.
+    pub const ALL: [BlockReason; 17] = [
+        BlockReason::OverTxCap,
+        BlockReason::OverDailyCap,
+        BlockReason::OverSpendCap,
+        BlockReason::OverSpendDailyCap,
+        BlockReason::ProgramNotAllowed,
+        BlockReason::TokenNotAllowed,
+        BlockReason::SlippageExceeded,
+        BlockReason::Expired,
+        BlockReason::Paused,
+        BlockReason::Revoked,
+        BlockReason::Unauthorized,
+        BlockReason::StaleOracle,
+        BlockReason::ActionNotAllowed,
+        BlockReason::DuplicateIntent,
+        BlockReason::GlobalHalt,
+        BlockReason::VenueRejected,
+        BlockReason::PostCheckFailed,
+    ];
+
+    /// The name exactly as it appears on a receipt, in mono, verbatim.
+    pub const fn name(self) -> &'static str {
+        match self {
+            BlockReason::OverTxCap => "OverTxCap",
+            BlockReason::OverDailyCap => "OverDailyCap",
+            BlockReason::OverSpendCap => "OverSpendCap",
+            BlockReason::OverSpendDailyCap => "OverSpendDailyCap",
+            BlockReason::ProgramNotAllowed => "ProgramNotAllowed",
+            BlockReason::TokenNotAllowed => "TokenNotAllowed",
+            BlockReason::SlippageExceeded => "SlippageExceeded",
+            BlockReason::Expired => "Expired",
+            BlockReason::Paused => "Paused",
+            BlockReason::Revoked => "Revoked",
+            BlockReason::Unauthorized => "Unauthorized",
+            BlockReason::StaleOracle => "StaleOracle",
+            BlockReason::ActionNotAllowed => "ActionNotAllowed",
+            BlockReason::DuplicateIntent => "DuplicateIntent",
+            BlockReason::GlobalHalt => "GlobalHalt",
+            BlockReason::VenueRejected => "VenueRejected",
+            BlockReason::PostCheckFailed => "PostCheckFailed",
+        }
+    }
+
+    /// Decode an on-chain byte. Unknown bytes are `None`, never a guess.
+    pub const fn from_u8(b: u8) -> Option<BlockReason> {
+        if (b as usize) < BlockReason::ALL.len() {
+            Some(BlockReason::ALL[b as usize])
+        } else {
+            None
+        }
+    }
+}
+
+/// What the book may do in one tick. `Skip` is the default everywhere.
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ActionKind {
+    Skip = 0,
+    Open = 1,
+    Increase = 2,
+    Reduce = 3,
+    Close = 4,
+    Flatten = 5,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn discriminants_match_the_chain() {
+        // The eleven emitted by 5o8E…, in the on-chain order (docs/FACTS.md).
+        let chain = [
+            (0u8, "OverTxCap"),
+            (1, "OverDailyCap"),
+            (2, "OverSpendCap"),
+            (3, "OverSpendDailyCap"),
+            (4, "ProgramNotAllowed"),
+            (5, "TokenNotAllowed"),
+            (6, "SlippageExceeded"),
+            (7, "Expired"),
+            (8, "Paused"),
+            (9, "Revoked"),
+            (10, "Unauthorized"),
+        ];
+        for (b, name) in chain {
+            let r = BlockReason::from_u8(b);
+            assert_eq!(r.map(|r| r.name()), Some(name));
+            assert_eq!(r.map(|r| r as u8), Some(b));
+        }
+    }
+
+    #[test]
+    fn all_is_in_discriminant_order_and_dense() {
+        for (i, r) in BlockReason::ALL.iter().enumerate() {
+            assert_eq!(*r as usize, i);
+        }
+        assert_eq!(BlockReason::from_u8(17), None);
+    }
+}

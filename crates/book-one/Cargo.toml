@@ -1,0 +1,28 @@
+[package]
+name = "book-one"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+description = "The house agent: scheduler, sidecar stub, core, guard, submitter, redteam, paper (VENUE=devnet | shadow)."
+publish = false
+
+[[bin]]
+name = "book-one"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+markov-guard = { path = "../markov-guard" }
+markov-marks = { path = "../markov-marks" }
+markov-types = { path = "../markov-types" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "signal"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+
+[dev-dependencies]
+tempfile = "3"

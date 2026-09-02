@@ -1,0 +1,11 @@
+[package]
+name = "markov-guard"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+description = "The pure risk guard: (Intent, GuardState, PolicyView) -> Verdict. No I/O, no clock, no network. See crates/markov-guard/deny.toml."
+publish = false
+
+[dependencies]
+markov-types = { path = "../markov-types" }

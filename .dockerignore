@@ -1,0 +1,12 @@
+.git
+target
+node_modules
+apps
+packages
+landing
+docs
+paper
+keys
+scripts
+.github
+*.md
