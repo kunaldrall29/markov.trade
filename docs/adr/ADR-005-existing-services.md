@@ -1,6 +1,6 @@
 # ADR-005 — The existing TypeScript services vs. the pack's Rust workspace (decision D4)
 
-Status: **Proposed — needs Kunal** · Date: 2026-09-01 · Seat: Protocol + Agents + Truth · Blocks: P07, P09, P10, P13 scoping
+Status: **Accepted 2026-09-02** (Kunal: "for others decide on me"; decided per the Recommendation, see Decision at the end) · Date: 2026-09-01 · Seat: Protocol + Agents + Truth · Blocks: P07, P09, P10, P13 scoping
 
 ## What exists (verified 2026-09-01)
 
@@ -45,3 +45,7 @@ If Kunal wants B or C, `docs/07` §4 needs a superseding ADR first, and the cale
 ## Consequences
 
 The existing services are treated as read-only evidence and as a source of devnet facts (mints, pools, operator pubkeys). No Gate B code imports from `kunaldrall29/markov`. The Telegram bot token and the `2fpQ…` deployer stay where they are until the new services are ready to take over, and the emergency key for Gate B is a **new** keypair generated per `docs/14` §5.
+
+## Decision (2026-09-02)
+
+**Option A, the pack's Rust workspace, parity first.** The parity job and finalizer are the first deliverables of P09/P10; `data-api` is scoped to the endpoints B9 and `/book` need; if the calendar slips, the cut list is the `/receipts` route and bot alerts, never parity. Services deploy to a **new Railway project `markov-devnet`** with its own Postgres and per-service env scopes (operator key only in `book-one`, emergency key only in `bot`), so nothing shares a network or a table with the old `markov` project, which is left untouched. No code is copied from `kunaldrall29/markov`; its devnet facts (mints, pools, pubkeys, IDL) are read-only inputs.

@@ -1,6 +1,6 @@
 # ADR-006 — Build order for 1–27 September (Session 0 proposal)
 
-Status: **Proposed — needs Kunal** · Date: 2026-09-01 · Seat: all
+Status: **Accepted 2026-09-02** (Kunal: "for others decide on me"; decided per the Recommendation, see Decision at the end) · Date: 2026-09-01 · Seat: all
 
 Today is 1 Sep. Gate B closes 27 Sep or is disclosed open. The pack's P01 window (31 Aug–2 Sep) is already half gone and its pre-flight is red on three counts (no faucet SOL, D0/D3 undecided, no program row that matches the spec). The order below keeps P08 first because paper days cannot be manufactured, and pulls every decision to the front so that no seat writes code against a `PENDING` row.
 
@@ -35,3 +35,7 @@ Today is 1 Sep. Gate B closes 27 Sep or is disclosed open. The pack's P01 window
 ## Slip rule (from `docs/16`)
 
 If on 27 Sep anything is red, Gate B is disclosed open in the order B4 → B5 → B8 → B9 → B14, and no real-venue promise is added that week.
+
+## Decision (2026-09-02)
+
+Accepted as the plan with ADR-001 B, ADR-004 A, ADR-005 A. P08 starts today with `MARK_SOURCE=onchain`; P01 runs today with the SBF build as its first act. The RPC provider key is supplied by Kunal later; until it arrives, submits and ingestion use the public devnet RPC with backoff and the calendar rows for P07/P09 carry that as a known risk.

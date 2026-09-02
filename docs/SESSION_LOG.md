@@ -2,6 +2,12 @@
 
 One `##` per session, newest first. Facts, not narrative. What was verified, how, and what was not.
 
+## 2026-09-02 — Session 1: decisions accepted, keys, P01 bootstrap, P08 start
+
+- **Kunal's answer to Session 0:** "create new wallet, i will provide RPC provider key later, for others decide on me." Decisions taken per the recommendations and recorded as Accepted in ADR-001…006 (Anchor 1.1.2 + Agave 4.2.2; one origin; on-chain Pyth account with seconds-based freshness and program-side binding, house poster as fallback; successor program with new mints, enum 0–10 verbatim + 11–16, `emit_cpi`, on-chain IDL, verifiable build; Rust workspace with parity first in a new Railway project `markov-devnet`).
+- **Keys:** five keypairs generated under `keys/` (gitignored, 600), public keys in FACTS and `keys/README.md`. Faucet refused all five (rate limit); balances 0. Funding is on Kunal (deployer `8wuYJD6b…`) or a later faucet retry. **P01 pre-flight #2 is red** for that reason; everything in P01 that needs no SOL proceeds, deploys wait.
+- **RPC provider key:** pending from Kunal; public devnet with backoff until then.
+
 ## 2026-09-01 — Session 0: verify, FACTS, gap list, decisions (no code)
 
 - **Goal:** read the pack in order, verify the toolchain and the deployed program, create `docs/FACTS.md`, report gaps, surface D1–D3, propose the build order. Then stop.

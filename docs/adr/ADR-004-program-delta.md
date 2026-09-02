@@ -1,6 +1,6 @@
 # ADR-004 — Program delta vs. successor (decision D3) and spec reconciliation
 
-Status: **Proposed — needs Kunal** · Date: 2026-09-01 · Seat: Protocol · Blocks: P01 (program row in FACTS), P02, P03, P09
+Status: **Accepted 2026-09-02** (Kunal: "for others decide on me"; decided per the Recommendation, see Decision at the end) · Date: 2026-09-01 · Seat: Protocol · Blocks: P01 (program row in FACTS), P02, P03, P09
 
 ## What is actually deployed (verified 2026-09-01, `docs/FACTS.md`)
 
@@ -57,3 +57,7 @@ Regardless of A or B: `docs/10-PROGRAM-SPEC.md` §1, §2, §4 and `CORRECTIONS.m
 2. Is `execute_swap` / `demo_swap` history worth keeping in the public feed? Recommendation: yes, indexed under its own `program_id` (see above), rather than starting the feed at the successor's first slot.
 3. Confirm that the six appended reason names above are the ones you want; they cannot change after first emit.
 4. Funding source for the successor deploy and the P02–P04 redeploys (devnet SOL) given the faucet refusal.
+
+## Decision (2026-09-02)
+
+**Option A, successor program.** Kunal does not hold `2fpQ…` ("create new wallet"), so B is impossible and A is the decision. Answers to the open inputs: (1) a fresh deployer keypair is the upgrade authority of the successor, its program keypair is generated in P01, and **new USDC-d and SOL-d mints** are created by that deployer and labelled as Gate B mints (the `6eDV…` mint stays with `5o8E…`); (2) `5o8E…` history is kept in the public feed under its own `program_id` with per-row explorer links, backfilled once from its IDL; (3) the appended reasons are fixed as `StaleOracle`=11, `ActionNotAllowed`=12, `DuplicateIntent`=13, `GlobalHalt`=14, `VenueRejected`=15, `PostCheckFailed`=16, in the order pack v0.2's `CORRECTIONS.md` lists them; (4) funding is by devnet faucet to the new deployer, and if the faucet keeps refusing, Kunal sends devnet SOL to the deployer pubkey recorded in FACTS. Receipts use `emit_cpi` as the pack specifies (durability over ingestion cost; the RPC provider key Kunal is supplying carries the `getTransaction`-per-signature path). The successor publishes its IDL on chain and is built verifiably. `docs/10` §1/§2/§4 and `CORRECTIONS.md` are amended to the chain's names and numbering before P02 writes code.

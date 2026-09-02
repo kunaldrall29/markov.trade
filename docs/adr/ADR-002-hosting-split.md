@@ -1,6 +1,6 @@
 # ADR-002 — Hosting split for `markov.trade` (decision D1)
 
-Status: **Proposed — needs Kunal** · Date: 2026-09-01 · Seat: Surfaces · Blocks: P11, P12, P14, P15, DNS
+Status: **Accepted 2026-09-02** (Kunal: "for others decide on me"; decided per the Recommendation, see Decision at the end) · Date: 2026-09-01 · Seat: Surfaces · Blocks: P11, P12, P14, P15, DNS
 
 ## Context
 
@@ -42,3 +42,7 @@ Kunal's `kunaldrall29/markov-landing-new` is not a static file; it is the TanSta
 ## Consequences
 
 DNS is not touched until this ADR is Accepted. `BOOK_URL`, `RECEIPTS_API_URL`, `HEALTH_URL` stay PENDING in FACTS until the hosts answer logged-out over HTTPS.
+
+## Decision (2026-09-02)
+
+**Option A, one origin.** `apps/web` serves `/`, `/book`, `/receipts`, `/paper` from one Vercel project on `markov.trade` (+ `www` redirecting to the apex). `api.markov.trade` is a CNAME to the Rust `data-api` on Railway. CORS allowlist: `https://markov.trade`, `https://www.markov.trade`, plus an explicit env list for Vercel preview origins during P11; never `*`. Cloudflare records are DNS-only (proxy off) and are added by Kunal only when a host answers: the apex/`www` targets come from the Vercel project's Domains panel, the `api` target from `railway domain`. Default hosts (`*.vercel.app`, `*.up.railway.app`) get deployment protection or a redirect before the tape. Until then `BOOK_URL`, `RECEIPTS_API_URL`, `HEALTH_URL` stay PENDING.

@@ -1,6 +1,6 @@
 # ADR-001 — Toolchain pin (decision D0)
 
-Status: **Proposed — needs Kunal** · Date: 2026-09-01 · Seat: Protocol · Blocks: P01, P02, P04, P05
+Status: **Accepted 2026-09-02** (Kunal: "for others decide on me"; decided per the Recommendation, see Decision at the end) · Date: 2026-09-01 · Seat: Protocol · Blocks: P01, P02, P04, P05
 
 ## Context
 
@@ -47,3 +47,7 @@ Either way P01 must prove, with output pasted into FACTS: `anchor build` of an e
 - `@codama/nodes-from-anchor` converts IDLs from both 0.31 and 1.x (`anchor-lang-idl-spec` 0.1.x on both), so the Codama/Kit argument does not differentiate B; the on-chain IDL (`anchor idl init`) matters more for the web seat than the pin.
 - Truth seat: the chosen pin should produce a **verifiable build** (`anchor build --verifiable` / `solana-verify`) so the successor's on-chain hash can be published in FACTS and `/v1/facts`; today nothing ties the deployed bytecode to a source commit except `declare_id!`.
 - Both branches still lack an SBF build + LiteSVM test run. **Decision date: 2 Sep**, so P01's first act is the build.
+
+## Decision (2026-09-02)
+
+**Option B.** Pin **Anchor 1.1.2** and **Agave 4.2.2** in `Anchor.toml [toolchain]` (`anchor_version = "1.1.2"`, `solana_version = "4.2.2"`), host Rust pinned in `rust-toolchain.toml` to `1.97.1` (the SBF target uses platform-tools' own rustc), `pyth-solana-receiver-sdk 2.0.0`. LiteSVM starts at **0.16.0** (host `cargo check` passed in the verification pass); if the P01 SBF build or the LiteSVM test harness fails to resolve, fall back to the Anchor 1.1.2 template pin `0.10.0` and record which one built. `anchor build --verifiable` is required from P02 so the on-chain hash ties to a commit. `anchor` is never run outside the project.

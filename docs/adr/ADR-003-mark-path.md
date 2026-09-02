@@ -1,6 +1,6 @@
 # ADR-003 — Mark path (decision D2)
 
-Status: **Proposed — needs Kunal** · Date: 2026-09-01 · Seat: Protocol + Agents · Blocks: P04, P06, P07, **P08 (paper runner cannot start without a price source)**
+Status: **Accepted 2026-09-02** (Kunal: "for others decide on me"; decided per the Recommendation, see Decision at the end) · Date: 2026-09-01 · Seat: Protocol + Agents · Blocks: P04, P06, P07, **P08 (paper runner cannot start without a price source)**
 
 ## Context (verified 2026-09-01)
 
@@ -36,3 +36,7 @@ Whatever is chosen, the on-chain `source` field and the page label must match th
 ## Consequences
 
 `MARK_SOURCE`, `MARK_MAX_AGE_SLOTS` and `MARK_POSTER_PUBKEY` in FACTS are filled by P04 after a signature exists. `HERMES_URL` stays recorded as "requires key" so nobody writes code against the open endpoint again.
+
+## Decision (2026-09-02)
+
+**Option A with C built as the fallback.** The mark is the devnet Pyth SOL/USD `PriceUpdateV2` account `7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE`, read on chain by the program through `pyth-solana-receiver-sdk 2.0.0` and off chain by the agent and the paper runner through the same account over RPC. The program binds the account: `owner == rec5…`, `feed_id == ef0d8b6f…`, `verification_level == Full`, each with a named refusal test. **The freshness gate is in seconds, not slots** (`Clock::unix_timestamp − publish_time <= max_mark_age_secs`, policy default **150 s** ≈ three pusher intervals), because devnet pacing (≈165 ms/slot today) makes a slot count unstable; slots are still reported for display. `docs/10` gate 12 and the `Policy` field are amended accordingly in P02 (`max_mark_age_secs`). P04 also ships the house poster that relays the same Pyth account into a `MarkAccount` with `source = house`, so the book survives the sponsored pusher stopping; the page labels the live source honestly either way and shows the threshold next to the age. `MARK_SOURCE=onchain` for P08 from today.
