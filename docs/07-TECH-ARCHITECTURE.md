@@ -144,11 +144,11 @@ flowchart TD
   G2 -- Revoked --> R3["Revoked"]
   G2 -- Expired --> R4["Expired"]
   G2 -- yes --> G3{"3 signer = mandate.operator?"}
-  G3 -- no --> R5["NotOperator"]
+  G3 -- no --> R5["Unauthorized"]
   G3 -- yes --> G4{"4 intent_id new this day?"}
   G4 -- no --> R6["DuplicateIntent"]
   G4 -- yes --> G5{"5 venue in policy AND registry?"}
-  G5 -- no --> R7["VenueNotAllowed"]
+  G5 -- no --> R7["ProgramNotAllowed"]
   G5 -- yes --> G6{"6 mint in policy.tokens?"}
   G6 -- no --> R8["TokenNotAllowed"]
   G6 -- yes --> G7{"7 action in allowed_actions?"}
@@ -162,7 +162,7 @@ flowchart TD
   G10 -- yes --> G11{"11 slippage <= max_slippage_bps?"}
   G11 -- no --> R13["SlippageExceeded"]
   G11 -- yes --> G12{"12 mark age <= max_age_slots?"}
-  G12 -- no --> R14["StaleOracle"]
+  G12 -- no --> R14["StaleOracle (seconds since publish_time, ADR-003)"]
   G12 -- yes --> CPI["CPI into venue, mandate PDA signs"]
   CPI -- venue error --> R15["13 VenueRejected"]
   CPI -- ok --> POST{"14 post-checks: vault delta, position delta"}

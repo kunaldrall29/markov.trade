@@ -7,4 +7,11 @@ license = "MIT"
 description = "Types shared by the programs and the services: BlockReason, action kinds, policy view, IDs. Must compile for SBF and host."
 publish = false
 
+[features]
+default = []
+# Derives Anchor's borsh + IDL traits so the on-chain program and the services
+# share one BlockReason definition (docs/07 §4).
+anchor = ["dep:anchor-lang"]
+
 [dependencies]
+anchor-lang = { version = "1.1.2", optional = true }

@@ -8,3 +8,5 @@ node_modules/
 dist/
 .grok/*
 !.grok/app-env.json
+.vercel
+.env*

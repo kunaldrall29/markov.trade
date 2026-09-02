@@ -34,29 +34,29 @@ Nothing in v0.1 invented a live venue, an APY, a pool, or an LLM signer. Those l
 ```
 1  GlobalHalt
 2  state → Paused | Revoked | Expired
-3  NotOperator
+3  Unauthorized        (chain name; the pack said NotOperator)
 4  DuplicateIntent
-5  VenueNotAllowed     (policy.venues AND registry.adapters)
+5  ProgramNotAllowed   (policy.venues AND registry.adapters; chain name; the pack said VenueNotAllowed)
 6  TokenNotAllowed
 7  ActionNotAllowed
 8  OverTxCap
 9  OverDailyCap
 10 OverSpendCap / OverSpendDailyCap
 11 SlippageExceeded
-12 StaleOracle
+12 StaleOracle         (seconds since publish_time, ADR-003)
 13 VenueRejected       (CPI error)
 14 PostCheckFailed     (hard Err; transaction reverts)
 ```
 
 Gates 1–13 emit a `RefusalReceipt` and return `Ok(())`. Gate 14 is the only refusal that is allowed to be an `Err`.
 
-Historical eleven (append-only, discriminants from the deployed IDL):
+Historical eleven (append-only; **amended 2026-09-02 from the chain, `docs/FACTS.md`** — the deployed program has no on-chain IDL, so these come from 20 on-chain `ActionRefused` payloads and the checked-in IDL):
 
-`Paused, Revoked, Expired, NotOperator, VenueNotAllowed, TokenNotAllowed, OverTxCap, OverDailyCap, OverSpendCap, OverSpendDailyCap, SlippageExceeded`
+`0 OverTxCap, 1 OverDailyCap, 2 OverSpendCap, 3 OverSpendDailyCap, 4 ProgramNotAllowed, 5 TokenNotAllowed, 6 SlippageExceeded, 7 Expired, 8 Paused, 9 Revoked, 10 Unauthorized`
 
 New in Gate B (append at end of deployed enum, never reorder):
 
-`StaleOracle, ActionNotAllowed, DuplicateIntent, GlobalHalt, VenueRejected, PostCheckFailed`
+`11 StaleOracle, 12 ActionNotAllowed, 13 DuplicateIntent, 14 GlobalHalt, 15 VenueRejected, 16 PostCheckFailed`
 
 Plus off-chain-only guard reasons (not on-chain discriminants in v0): `DeltaBandExceeded`, `GrossExceeded`, `DailyLossHalt`, `GuardInternal`.
 

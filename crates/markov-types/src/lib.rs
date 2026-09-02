@@ -6,11 +6,17 @@
 //! the order fixed by ADR-004. Never rename, reorder, or reuse a variant.
 #![forbid(unsafe_code)]
 #![warn(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-#![no_std]
 
 /// Machine-readable refusal reason. Discriminant = on-chain byte.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "anchor",
+    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, anchor_lang::InitSpace)
+)]
+// The wire byte IS the explicit discriminant: 0-10 are exactly what the
+// predecessor emitted on devnet, so the encoding must not renumber them.
+#[cfg_attr(feature = "anchor", borsh(use_discriminant = true))]
 pub enum BlockReason {
     OverTxCap = 0,
     OverDailyCap = 1,
@@ -90,6 +96,13 @@ impl BlockReason {
 /// What the book may do in one tick. `Skip` is the default everywhere.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "anchor",
+    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, anchor_lang::InitSpace)
+)]
+// The wire byte IS the explicit discriminant: 0-10 are exactly what the
+// predecessor emitted on devnet, so the encoding must not renumber them.
+#[cfg_attr(feature = "anchor", borsh(use_discriminant = true))]
 pub enum ActionKind {
     Skip = 0,
     Open = 1,
@@ -97,6 +110,58 @@ pub enum ActionKind {
     Reduce = 3,
     Close = 4,
     Flatten = 5,
+}
+
+/// Which way a position leans. Shared so the agent, the program and the
+/// indexer spell it the same way.
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "anchor",
+    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, anchor_lang::InitSpace)
+)]
+// The wire byte IS the explicit discriminant: 0-10 are exactly what the
+// predecessor emitted on devnet, so the encoding must not renumber them.
+#[cfg_attr(feature = "anchor", borsh(use_discriminant = true))]
+pub enum Side {
+    Long = 0,
+    Short = 1,
+}
+
+impl Side {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Side::Long => "long",
+            Side::Short => "short",
+        }
+    }
+}
+
+impl ActionKind {
+    pub const fn name(self) -> &'static str {
+        match self {
+            ActionKind::Skip => "skip",
+            ActionKind::Open => "open",
+            ActionKind::Increase => "increase",
+            ActionKind::Reduce => "reduce",
+            ActionKind::Close => "close",
+            ActionKind::Flatten => "flatten",
+        }
+    }
+}
+
+#[cfg(test)]
+mod side_tests {
+    use super::*;
+
+    #[test]
+    fn side_and_action_names_are_stable() {
+        assert_eq!(Side::Long as u8, 0);
+        assert_eq!(Side::Short as u8, 1);
+        assert_eq!(ActionKind::Skip as u8, 0);
+        assert_eq!(ActionKind::Flatten as u8, 5);
+        assert_eq!(ActionKind::Open.name(), "open");
+    }
 }
 
 #[cfg(test)]

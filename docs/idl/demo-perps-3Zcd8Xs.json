@@ -1,0 +1,103 @@
+{
+  "address": "3Zcd8XsFWBTVku5GxQjwEBC7sLrJhF8vadyTnTr56hxB",
+  "metadata": {
+    "name": "demo_perps",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "demo_perps: the mock venue behind the real adapter trait, zero token custody (P04)."
+  },
+  "instructions": [
+    {
+      "name": "venue_execute",
+      "docs": [
+        "The adapter entry point. The **mandate PDA** must sign: the operator",
+        "key never reaches a venue directly.",
+        "",
+        "P02 scope: accept a well-formed call from a mandate and record it in",
+        "the log. No position is opened, no token moves, nothing is filled —",
+        "P04 adds all of that, and until then no page may claim a fill."
+      ],
+      "discriminator": [
+        32,
+        251,
+        99,
+        69,
+        125,
+        242,
+        154,
+        41
+      ],
+      "accounts": [
+        {
+          "name": "mandate",
+          "docs": [
+            "The mandate PDA, signing through `invoke_signed`."
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "VenueExecuteArgs"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidNotional",
+      "msg": "notional must be greater than zero"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidLimitPrice",
+      "msg": "limit price must be greater than zero"
+    }
+  ],
+  "types": [
+    {
+      "name": "VenueExecuteArgs",
+      "docs": [
+        "Mirrors `markov_mandate::cpi::venue::VenueExecuteArgs`. P03 makes this one",
+        "shared definition; until then the two must be kept identical, which the",
+        "mandate's `sighash` test and this program's discriminator pin down."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "action",
+            "type": "u8"
+          },
+          {
+            "name": "market",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "side",
+            "type": "u8"
+          },
+          {
+            "name": "notional",
+            "type": "u64"
+          },
+          {
+            "name": "limit_price",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

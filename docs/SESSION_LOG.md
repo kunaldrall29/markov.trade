@@ -2,6 +2,15 @@
 
 One `##` per session, newest first. Facts, not narrative. What was verified, how, and what was not.
 
+## 2026-09-02 (later) — P02: the mandate program, deployed
+
+- **Written and deployed.** `programs/markov-mandate` is the real lock now: `Mandate`/`Policy`/`Registry`, the 14-gate ladder in `gates.rs` (one function per rung, first failure wins and names its index), receipts via `emit_cpi!`, tighten-only `amend_policy`, an 8-slot replay ring, UTC-day rollover, and the Pyth mark bound three ways (owner, feed id, `Full`) before it is a price. `owner_withdraw` has no state check anywhere in its path. Upgraded on devnet at slot 492045049; `demo_perps` deployed alongside with only the `venue_execute` entry point P04 will flesh out.
+- **35 tests green**, 17 unit and 18 LiteSVM against the built `.so`. `gate_order_matches_spec` asserts reason *and* gate index for all 13 rungs; `withdraw_succeeds_in_every_state` covers six states × four amounts.
+- **Proven on devnet, not just in LiteSVM:** the `OverTxCap` transaction has `err: None` and carries a decodable `RefusalReceipt` (`reason=0`, `gate_index=8`, `forced=true`). Six signatures in FACTS `P02_DEVNET_RUN`; they are P02 evidence, not Gate B proofs, and FACTS says so.
+- **Spec amended to the chain** before code, as ADR-004 required: `docs/10` §3/§4, `docs/07` §6 and `CORRECTIONS.md` now carry `Unauthorized`/`ProgramNotAllowed` and `OverTxCap`=0, and the freshness gate is in seconds (ADR-003).
+- **Landing page live** at `markov-trade.vercel.app` (Vercel team `lemmalabs1`, project `markov-trade`), built from the committed tree; `copy-grep` clean on the production HTML. `markov.trade` and `www` are attached but the Cloudflare zone has no records — two A records to `76.76.21.21`, proxy off, are Kunal's to add.
+- **Not done:** the on-chain IDL publish (HTTP 429 on the public RPC — retry with the provider key); gates 13/14 end to end (need a venue that can fail, P04).
+
 ## 2026-09-02 — Session 1: decisions accepted, keys, P01 bootstrap, P08 start
 
 - **Kunal's answer to Session 0:** "create new wallet, i will provide RPC provider key later, for others decide on me." Decisions taken per the recommendations and recorded as Accepted in ADR-001…006 (Anchor 1.1.2 + Agave 4.2.2; one origin; on-chain Pyth account with seconds-based freshness and program-side binding, house poster as fallback; successor program with new mints, enum 0–10 verbatim + 11–16, `emit_cpi`, on-chain IDL, verifiable build; Rust workspace with parity first in a new Railway project `markov-devnet`).

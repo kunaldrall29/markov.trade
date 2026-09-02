@@ -45,7 +45,7 @@ Reserve trailing padding so Phase-1 fields (`max_net_delta_usd`, `max_gross_usd`
 | `daily_cap` | `u64` | 200 |
 | `max_slippage_bps` | `u16` | 50 |
 | `spend_per_call`, `spend_daily` | `u64` | small, non-zero |
-| `max_mark_age_slots` | `u64` | e.g. 150 |
+| `max_mark_age_secs` | `u64` | 150 (seconds since `publish_time`, ADR-003; devnet pacing ≈165 ms/slot makes a slot count unstable) |
 | `expiry_ts` | `i64` | now + 14 days |
 
 **Tighten-only diff.** `amend_policy` accepts a full `Policy` and asserts, field by field:
@@ -102,16 +102,16 @@ Implemented in `gates.rs` as one function per gate, called in this exact sequenc
 |---|---|---|
 | 1 | registry global halt | `GlobalHalt` |
 | 2 | mandate state | `Paused` / `Revoked` / `Expired` |
-| 3 | signer is `mandate.operator` | `NotOperator` |
+| 3 | signer is `mandate.operator` | `Unauthorized` |
 | 4 | duplicate `intent_id` | `DuplicateIntent` |
-| 5 | venue program in `policy.venues` **and** in `registry.adapters` | `VenueNotAllowed` |
+| 5 | venue program in `policy.venues` **and** in `registry.adapters` | `ProgramNotAllowed` |
 | 6 | mint in `policy.tokens` | `TokenNotAllowed` |
 | 7 | action in `policy.allowed_actions` | `ActionNotAllowed` |
 | 8 | `notional <= per_tx_cap` | `OverTxCap` |
 | 9 | `day_notional_used + notional <= daily_cap` | `OverDailyCap` |
 | 10 | `spend <= spend_per_call` / `day_spend_used + spend <= spend_daily` | `OverSpendCap` / `OverSpendDailyCap` |
 | 11 | `intent.max_slippage_bps <= policy` and quote within bound | `SlippageExceeded` |
-| 12 | `slot - mark.slot <= policy.max_mark_age_slots` | `StaleOracle` |
+| 12 | `clock.unix_timestamp - mark.publish_time <= policy.max_mark_age_secs` (seconds, ADR-003; the mark account is bound: owner, feed id, `Full` verification) | `StaleOracle` |
 | 13 | CPI returns error | `VenueRejected` |
 | 14 | post-checks (vault delta, position delta, no authority change) | `PostCheckFailed` |
 
@@ -119,29 +119,29 @@ Implemented in `gates.rs` as one function per gate, called in this exact sequenc
 
 ## 4. `BlockReason`
 
-**Append-only.** Discriminants come from the deployed program; the names below are the working set. Week 0 dumps the IDL and fills the real numbers into FACTS. Never edit a row that has been emitted; add new rows at the end.
+**Append-only.** Discriminants 0–10 are exactly what the deployed predecessor `5o8E…` emitted on devnet (decoded from 20 on-chain `ActionRefused` payloads and its IDL, `docs/FACTS.md`, 2026-09-01); 11–16 are appended for Gate B in the order fixed by ADR-004. The successor program (ADR-004 option A) carries this enum verbatim. Never edit a row that has been emitted; add new rows at the end. *(Amended 2026-09-02: the v0.1/v0.2 table numbered `Paused` as 0 and named `NotOperator` / `VenueNotAllowed`; the chain disagrees, and the chain wins.)*
 
 | # | Name | Meaning |
 |---|---|---|
-| 0 | `Paused` | mandate paused |
-| 1 | `Revoked` | mandate revoked |
-| 2 | `Expired` | past expiry |
-| 3 | `NotOperator` | signer is not the mandate operator |
-| 4 | `VenueNotAllowed` | venue not in policy/registry |
+| 0 | `OverTxCap` | notional above per-tx cap |
+| 1 | `OverDailyCap` | notional above rolling daily cap |
+| 2 | `OverSpendCap` | spend above per-call budget |
+| 3 | `OverSpendDailyCap` | spend above daily budget |
+| 4 | `ProgramNotAllowed` | venue program not in policy / registry |
 | 5 | `TokenNotAllowed` | mint not in policy |
-| 6 | `OverTxCap` | notional above per-tx cap |
-| 7 | `OverDailyCap` | notional above rolling daily cap |
-| 8 | `OverSpendCap` | spend above per-call budget |
-| 9 | `OverSpendDailyCap` | spend above daily budget |
-| 10 | `SlippageExceeded` | quote outside bound |
-| — | `StaleOracle` | *new in Gate B* — mark older than policy allows |
-| — | `ActionNotAllowed` | *new* — action kind not permitted |
-| — | `DuplicateIntent` | *new* — replay of an intent id |
-| — | `GlobalHalt` | *new* — registry circuit open |
-| — | `VenueRejected` | *new* — venue CPI returned an error |
-| — | `PostCheckFailed` | *new* — invariant broken after CPI |
+| 6 | `SlippageExceeded` | quote outside bound |
+| 7 | `Expired` | past expiry |
+| 8 | `Paused` | mandate paused |
+| 9 | `Revoked` | mandate revoked |
+| 10 | `Unauthorized` | signer is not the mandate operator |
+| 11 | `StaleOracle` | *new in Gate B* — mark older than policy allows, or mark account not bound |
+| 12 | `ActionNotAllowed` | *new* — action kind not permitted |
+| 13 | `DuplicateIntent` | *new* — replay of an intent id |
+| 14 | `GlobalHalt` | *new* — registry circuit open |
+| 15 | `VenueRejected` | *new* — venue CPI returned an error |
+| 16 | `PostCheckFailed` | *new* — invariant broken after CPI (hard `Err`, reverts) |
 
-Gate B requires the original eleven to still exist **and** requires Book One to have actually triggered `OverTxCap`, `Revoked`, and one of the spend/slippage reasons.
+Gate B requires the original eleven to still exist with these discriminants **and** requires Book One to have actually triggered `OverTxCap`, `Revoked`, and one of the spend/slippage reasons on the successor program.
 
 ## 5. Events (the receipts)
 

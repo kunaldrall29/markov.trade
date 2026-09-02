@@ -16,24 +16,41 @@ default = []
 cpi = ["no-entrypoint"]
 no-entrypoint = []
 no-log-ix-name = []
-idl-build = ["anchor-lang/idl-build"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 anchor-debug = []
 custom-heap = []
 custom-panic = []
 
 [dependencies]
-anchor-lang = "1.1.2"
-# ADR-001 / ADR-003: prove the Pyth receiver SDK compiles for SBF on this pin
-# before P04 depends on it. Unused until P04.
+anchor-lang = { version = "1.1.2", features = ["event-cpi"] }
+anchor-spl = "1.1.2"
+# One BlockReason for the program and the services (docs/07 §4).
+markov-types = { path = "../../crates/markov-types", features = ["anchor"] }
+# ADR-003: the mark is a Pyth devnet PriceUpdateV2 account; the SDK enforces
+# owner, feed id, verification level and age in one call.
 pyth-solana-receiver-sdk = "2.0.0"
+# Anchor 1.1.2's `solana_program` shim does not re-export a hasher; this is the
+# same crate Anchor itself uses for discriminators.
+solana-sha256-hasher = "3"
 
 [dev-dependencies]
-# ADR-001: start at LiteSVM 0.16.0; fall back to the Anchor 1.1.2 template pin 0.10.0 if this fails to build.
 litesvm = "0.16.0"
 solana-message = "4"
 solana-transaction = "4"
 solana-signer = "3"
 solana-keypair = "3"
+solana-account = "4"
+solana-instruction = "3"
+solana-pubkey = "3"
+# The mandate CPIs into the mock venue; the tests need its ID and its .so.
+demo_perps = { path = "../demo-perps", features = ["no-entrypoint"] }
+# Devnet evidence runner (examples/devnet_smoke.rs). Host-only; the SBF build
+# never sees these. P07 folds this into crates/markov-chain.
+solana-client = "4.2.2"
+solana-commitment-config = "3"
+solana-system-interface = "2"
+anyhow = "1"
+anchor-spl = "1.1.2"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
