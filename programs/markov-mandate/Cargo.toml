@@ -1,0 +1,39 @@
+[package]
+name = "markov_mandate"
+version = "0.1.0"
+description = "Markov Book mandate program: the lock. Gates, receipts, owner verbs (P02)."
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "markov_mandate"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = "1.1.2"
+# ADR-001 / ADR-003: prove the Pyth receiver SDK compiles for SBF on this pin
+# before P04 depends on it. Unused until P04.
+pyth-solana-receiver-sdk = "2.0.0"
+
+[dev-dependencies]
+# ADR-001: start at LiteSVM 0.16.0; fall back to the Anchor 1.1.2 template pin 0.10.0 if this fails to build.
+litesvm = "0.16.0"
+solana-message = "4"
+solana-transaction = "4"
+solana-signer = "3"
+solana-keypair = "3"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

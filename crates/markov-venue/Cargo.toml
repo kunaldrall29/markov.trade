@@ -1,0 +1,10 @@
+[package]
+name = "markov-venue"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+description = "VenueAdapter trait plus the demo_perps client; the Gate C seam (B11)."
+publish = false
+
+[dependencies]

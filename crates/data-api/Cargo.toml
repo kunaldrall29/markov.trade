@@ -1,0 +1,10 @@
+[package]
+name = "data-api"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+description = "Read-only axum API: /health, /v1/receipts, /v1/book/stats, /v1/mandates, /v1/paper, /v1/facts."
+publish = false
+
+[dependencies]

@@ -19,3 +19,12 @@ test-ledger/
 .idea/
 .vscode/
 *.swp
+
+# P01 additions
+.turbo/
+**/.vercel/output/
+**/.output/
+*.so
+
+# paper tick logs are diagnostics, not the product; the daily .md files are committed
+paper/ticks/

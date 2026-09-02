@@ -1,0 +1,27 @@
+name: rust
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo build --workspace
+      - run: cargo test --workspace --exclude program-tests
+      - name: cargo-deny and cargo-audit
+        run: |
+          cargo install cargo-deny cargo-audit --locked
+          cargo deny check
+          cargo deny --manifest-path crates/markov-guard/Cargo.toml check bans
+          cargo audit
+      - name: guard purity (no I/O, clock, or RPC crates in markov-guard's tree)
+        run: bash scripts/guard-purity.sh

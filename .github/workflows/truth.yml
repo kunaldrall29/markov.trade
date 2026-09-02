@@ -1,0 +1,32 @@
+name: truth
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+jobs:
+  copy-grep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: build and render apps/web routes
+        run: |
+          pnpm --filter ./apps/web build
+          bash scripts/render-routes.sh apps/web /tmp/rendered / /book /receipts /paper
+      - name: copy-grep on built HTML (B15)
+        run: |
+          bash scripts/copy-grep.sh landing/ /tmp/rendered
+      - name: copy-grep must go red on a banned claim
+        run: |
+          mkdir -p /tmp/red && printf '<html><body><p>%s</p></body></html>' "Earn 12% APY, guaranteed. Built on Jupiter. $(head -c 400 /dev/zero | tr '\0' 'x' | fold -w 5 | tr '\n' ' ')" > /tmp/red/index.html
+          if bash scripts/copy-grep.sh /tmp/red; then echo "copy-grep did not fail on a banned claim"; exit 1; fi
+      - name: keypair-shaped strings must not be tracked
+        run: bash scripts/no-keys-in-tree.sh

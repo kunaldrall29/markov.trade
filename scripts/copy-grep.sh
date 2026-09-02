@@ -14,9 +14,20 @@ DIRS=("$@"); [ ${#DIRS[@]} -eq 0 ] && DIRS=(dist)
 FAIL=0
 SEP='::'
 
+# Non-greedy, multi-line aware. The original single-line sed was greedy: on
+# server-rendered HTML that arrives as ONE line it deleted everything between
+# the first <script> (theme boot in <head>) and the last </script> (module
+# loader before </body>), leaving one word per page and a vacuous "clean".
+# Found 2026-09-01 against apps/web's rendered routes; see docs/FACTS.md
+# COPY_GREP_APP.
 strip_html() {
-  sed -e 's|<script[^>]*>.*</script>||g' -e 's|<style[^>]*>.*</style>||g' -e 's|<[^>]*>| |g' "$1"
+  perl -0pe 's/<script\b[^>]*>.*?<\/script>//gis; s/<style\b[^>]*>.*?<\/style>//gis; s/<!--.*?-->//gs; s/<[^>]*>/ /g' "$1"
 }
+
+# Self-test: a stripped page must keep its visible words. Fails loudly if a
+# rendered page collapses to nothing after stripping, which is the failure mode
+# above and would otherwise pass every rule.
+MIN_WORDS=${COPY_GREP_MIN_WORDS:-40}
 
 # name :: extended-regex (case-insensitive) :: why it is banned
 RULES=(
@@ -42,7 +53,12 @@ ALLOW=(
 
 for dir in "${DIRS[@]}"; do
   while IFS= read -r -d '' f; do
-    text=$(strip_html "$f" | tr '\n' ' ' | tr -s ' ')
+    text=$(strip_html "$f" | tr -d '\000' | tr '\n' ' ' | tr -s ' ')
+    words=$(printf '%s' "$text" | wc -w)
+    if [ "$words" -lt "$MIN_WORDS" ]; then
+      printf 'FAIL  %-15s %s\n      rule: page has only %s visible words after stripping (min %s); the strip or the page is broken\n' "too-few-words" "$f" "$words" "$MIN_WORDS"
+      FAIL=1
+    fi
     for a in "${ALLOW[@]}"; do text=${text//"$a"/ }; done
     for rule in "${RULES[@]}"; do
       name=${rule%%${SEP}*}

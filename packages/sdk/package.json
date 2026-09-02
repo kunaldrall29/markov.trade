@@ -1,0 +1,11 @@
+{
+  "name": "@markov/sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Codama-generated Kit client from the markov-mandate IDL (P11). Checked in once generated.",
+  "type": "module",
+  "scripts": {
+    "build": "echo '@markov/sdk: nothing to build until the P02 IDL exists'",
+    "typecheck": "echo '@markov/sdk: nothing to typecheck yet'"
+  }
+}

@@ -1,0 +1,29 @@
+# Pins are binding (docs/08 §1, ADR-001). Every `anchor` invocation re-initialises
+# the active Solana release to `solana_version`; never run anchor outside this
+# directory.
+skip_local_validator = true
+
+[toolchain]
+anchor_version = "1.1.2"
+solana_version = "4.2.2"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.devnet]
+markov_mandate = "25CdYaZeB18QvUR7cTyZPgTZPNREb7t6xL8zmk1eXAU6"
+demo_perps = "3Zcd8XsFWBTVku5GxQjwEBC7sLrJhF8vadyTnTr56hxB"
+
+[programs.localnet]
+markov_mandate = "25CdYaZeB18QvUR7cTyZPgTZPNREb7t6xL8zmk1eXAU6"
+demo_perps = "3Zcd8XsFWBTVku5GxQjwEBC7sLrJhF8vadyTnTr56hxB"
+
+[provider]
+cluster = "devnet"
+wallet = "keys/deployer.json"
+
+[scripts]
+test = "cargo test -p markov_mandate -p demo_perps"
+
+[hooks]

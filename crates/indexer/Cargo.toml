@@ -1,0 +1,10 @@
+[package]
+name = "indexer"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+description = "Program logs -> Postgres, by IDL, with backfill, finalizer and the parity job."
+publish = false
+
+[dependencies]

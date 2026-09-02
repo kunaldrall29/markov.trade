@@ -1,0 +1,31 @@
+# cargo-deny policy for the whole workspace: advisories, licences, duplicates.
+# The markov-guard purity ban list is a separate file, crates/markov-guard/deny.toml,
+# run against that crate's manifest only (cargo-deny cannot scope a ban to one
+# workspace member from the root).
+[graph]
+all-features = false
+
+[advisories]
+version = 2
+# Unmaintained crates are an error only when they are DIRECT workspace
+# dependencies. bincode 1.3.3 (RUSTSEC-2025-0141) sits under anchor-lang and
+# every solana-* crate, and ansi_term (RUSTSEC-2021-0139) under litesvm; neither
+# has an upgrade path and neither is a vulnerability. Vulnerabilities stay errors
+# everywhere. Decided in P01, 2026-09-02; revisit when anchor-lang drops bincode.
+unmaintained = "workspace"
+ignore = []
+
+[licenses]
+version = 2
+allow = ["MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Unicode-DFS-2016", "Zlib", "MPL-2.0", "CC0-1.0", "0BSD", "OpenSSL", "Unlicense", "BSL-1.0"]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+deny = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = []

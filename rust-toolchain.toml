@@ -1,0 +1,5 @@
+# Host toolchain for services and tests. SBF programs are compiled by the
+# platform-tools shipped with the Agave release pinned in Anchor.toml.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]

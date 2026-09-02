@@ -1,0 +1,10 @@
+[package]
+name = "markov-chain"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+description = "RPC, transaction build, sign, send, confirm, retry."
+publish = false
+
+[dependencies]
