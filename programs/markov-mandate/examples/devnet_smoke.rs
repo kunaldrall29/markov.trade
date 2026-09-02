@@ -18,7 +18,14 @@ use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use solana_transaction::Transaction;
 
-const RPC: &str = "https://api.devnet.solana.com";
+/// Read from `RPC_HTTP_URL` so the run can use whichever endpoint FACTS
+/// currently names; the public default is the fallback of last resort.
+fn rpc_url() -> String {
+    std::env::var("RPC_HTTP_URL")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| "https://api.devnet.solana.com".to_string())
+}
 const USDC_D: Pubkey = solana_pubkey::pubkey!("7ajorFYMrE9Mi3yZkwWaZp6ahzkK6RotZ75qAdtTV9Rj");
 const SOL_D: Pubkey = solana_pubkey::pubkey!("73V1Vhs3A8j8NrXKCbGmRek2dR92x9MkwUk4WEdYYRfQ");
 const PYTH_SOL_USD: Pubkey =
@@ -46,16 +53,28 @@ fn send(rpc: &RpcClient, label: &str, ix: Instruction, payer: &Keypair, signers:
     let msg = Message::new(&[ix], Some(&payer.pubkey()));
     let mut tx = Transaction::new_unsigned(msg);
     tx.sign(signers, bh);
-    match rpc.send_and_confirm_transaction(&tx) {
-        Ok(sig) => {
-            println!("  {label:<28} {sig}");
-            Some(sig.to_string())
-        }
-        Err(e) => {
-            println!("  {label:<28} FAILED: {e}");
-            None
+    // Public endpoints rate-limit; a refusal to land is worth retrying, a
+    // refusal by the program is not (it already landed as a receipt).
+    let mut delay = std::time::Duration::from_millis(400);
+    for attempt in 1..=5 {
+        match rpc.send_and_confirm_transaction(&tx) {
+            Ok(sig) => {
+                println!("  {label:<28} {sig}");
+                return Some(sig.to_string());
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                let retryable = msg.contains("429") || msg.contains("rate") || msg.contains("timed out");
+                if !retryable || attempt == 5 {
+                    println!("  {label:<28} FAILED: {e}");
+                    return None;
+                }
+                std::thread::sleep(delay);
+                delay *= 2;
+            }
         }
     }
+    None
 }
 
 fn feed_id() -> [u8; 32] {
@@ -67,7 +86,16 @@ fn feed_id() -> [u8; 32] {
 }
 
 fn main() {
-    let rpc = RpcClient::new_with_commitment(RPC.to_string(), CommitmentConfig::confirmed());
+    let url = rpc_url();
+    let rpc = RpcClient::new_with_commitment(url.clone(), CommitmentConfig::confirmed());
+    // Refuse to run against anything but devnet. A mainnet URL here would make
+    // every read succeed and every number wrong.
+    match rpc.get_genesis_hash() {
+        Ok(h) if h.to_string() == "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG" => {}
+        Ok(h) => panic!("{url} is not devnet (genesis {h})"),
+        Err(e) => panic!("{url}: {e}"),
+    }
+    println!("rpc       {url}");
     let program = markov_mandate::ID;
     let venue = demo_perps::ID;
     let deployer = key("deployer");
