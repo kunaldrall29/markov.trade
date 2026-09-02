@@ -32,6 +32,13 @@ Kunal's `kunaldrall29/markov-landing-new` is not a static file; it is the TanSta
 
 `apps/web` router gets a `basepath`; the header component is duplicated into `landing/index.html` by hand; `scripts/copy-grep.sh` runs on both builds; `gate-b-verify.sh` opens two origins; `docs/13` §5 "header on every page" is satisfied by copy, not by code.
 
+## Verification pass (2026-09-01)
+
+- A CORS allowlist of exactly `https://markov.trade` blocks Vercel preview URLs, `www`, and local dev; P11 must develop against either a local `data-api` or an explicit preview-origin list. The existing Railway `data-api` cannot serve `/book` at all: it sends no `Access-Control-Allow-Origin` for `markov.trade`, is `chainReady:false` with a 1.2M-slot lag, indexes `5o8E…` not the successor, and returns 404 for `/v1/book/stats`, `/v1/mandates`, `/v1/paper`, `/v1/facts` — so P11's pre-flight #1 cannot pass until P10 is hosted.
+- DNS mechanics: Cloudflare records must be DNS-only (proxy off) for Vercel and Railway TLS; apex A record, `www` CNAME with a `www → apex` redirect so the tape shows one hostname.
+- Every Vercel project also answers on `<project>.vercel.app` and preview URLs, and Railway keeps `*.up.railway.app`; these are public origins the incognito pass never opens. Either add deployment protection / redirects on default hosts or list them in FACTS as public.
+- The "visible URL bar, no localhost" rule is from `prompts/P15`, not `docs/16` B14 (which says "production hosts").
+
 ## Consequences
 
 DNS is not touched until this ADR is Accepted. `BOOK_URL`, `RECEIPTS_API_URL`, `HEALTH_URL` stay PENDING in FACTS until the hosts answer logged-out over HTTPS.

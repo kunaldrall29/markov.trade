@@ -8,7 +8,7 @@ Today is 1 Sep. Gate B closes 27 Sep or is disclosed open. The pack's P01 window
 
 | ID | Decision | ADR | Blocks |
 |---|---|---|---|
-| D0 | Anchor / Agave / LiteSVM pin | ADR-001 | P01+ |
+| D0 | Anchor / Agave / LiteSVM pin (decision date 2 Sep; P01's first act is the SBF build) | ADR-001 | P01+ |
 | D1 | one origin vs split for `markov.trade` | ADR-002 | P11, DNS |
 | D2 | mark path (on-chain Pyth account / house `MarkAccount`) | ADR-003 | **P08 today**, P04 |
 | D3 | successor program vs in-place upgrade; spec amended to chain names | ADR-004 | P02 |
@@ -25,10 +25,12 @@ Today is 1 Sep. Gate B closes 27 Sep or is disclosed open. The pack's P01 window
 | 8–13 Sep | **P03** adapter trait, **P04** `demo_perps` + `MarkAccount`/on-chain mark, `mark-poster` | P07 runtime scaffold against P02 devnet deploy | Codama client from the P02 IDL (`packages/sdk`) | runbooks: faucet-topup, key-rotation |
 | 10–20 Sep | P09 indexer (Rust, parity job, finalizer) | **P07** hosted on Railway (new services, separate env scopes), redteam schedule → B3, B4, B5, B7 by 20 Sep | **P11** `/book` from 14 Sep against the hosted `data-api` | P14 alerts (guard divergence, refusal drought) |
 | 15–21 Sep | **P10** data-api, `api.markov.trade` live | 24 h skip-dominant log for B3 | P11 e2e: withdraw-enabled-in-every-state | parity deliberate-mismatch demo; indexer rebuild runbook timed |
-| 21–25 Sep | — | key-rotation drill (NotOperator proof) | **P13** bot (new emergency key, own service) → B6 pair; P12 port + visual diff | P14 `gate-b-verify.sh` first full table |
+| 21–25 Sep | — | key-rotation drill (`Unauthorized` proof) | **P13** bot (new emergency key, own service) → B6 pair; P12 port + visual diff | P14 `gate-b-verify.sh` first full table |
 | 25–27 Sep | — | — | tape recorded on production hosts, second-wallet replay | **P15** close ritual; `GATE_B_STATUS` |
 
-P08's seventh consecutive file lands on **8 Sep** if it starts 2 Sep; every day of slip on D2 moves that date one-for-one but never past the 20 Sep hard deadline.
+**P08 start rule (one sentence, superseding the three phrasings above and in ADR-003):** P08 starts now, reading the devnet Pyth account `7UVimffx…` over RPC as its mark, labelled `source: pyth-devnet-account`; it does not wait for ADR-003 to be accepted, because any later D2 answer only changes the `MarkSource` implementation, not the daily file. P08's seventh consecutive file lands on **8 Sep** if it starts 2 Sep.
+
+**What changes if Kunal picks the other option:** ADR-004 B (in-place upgrade) inserts a `Migration<From, To>` task into P02 and requires the `2fpQ…` key before 4 Sep. ADR-005 B or C (reuse TS services) removes P09/P10 from the Protocol column, adds "bring `apps/indexer` + `apps/data-api` to `docs/12`" to the Agents column from 10 Sep, and requires a superseding ADR for `docs/07` §4 first. ADR-001 A (Anchor 0.31.1) adds the lockfile-pinning work described in ADR-001 to P01 and removes `Migration` from P02's toolbox. The calendar above assumes A / A / B; it is a proposal, not a decision.
 
 ## Slip rule (from `docs/16`)
 

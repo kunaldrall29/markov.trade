@@ -34,6 +34,14 @@ Against the pack's `docs/12` and `docs/07`:
 
 If Kunal wants B or C, `docs/07` §4 needs a superseding ADR first, and the calendar in ADR-006 changes.
 
+## Verification pass (2026-09-01)
+
+- **Feasibility is the objection, not architecture.** Under ADR-006 the Protocol seat is single-threaded on P01 → P02 → P03/P04 → P09 → P10 between 2 and 21 Sep. Mitigations belong here: the parity job and finalizer are the **first** deliverables of P09/P10 (they are what makes B9 true), `data-api` is scoped to exactly the endpoints B9 and `/book` need, and if the calendar slips the cut list is `/receipts` route and bot alerts — never parity.
+- Option C is worse than described: the TS indexer decodes `Program data:` logs with Anchor's EventParser, so against a successor using `emit_cpi` its ingest path is dead code; C only works if the successor keeps `emit!`.
+- "Shared types" needs the concrete pattern: the guard and the indexer depend on the program crate with `no-entrypoint` and decode with the program's own `#[event]` structs; the `BlockReason` name list currently appears in 22 files of the TS tree.
+- Reusing the Railway Postgres is not free: the TS indexer still writes a `receipts` table whose columns differ from `docs/12` §2; the Rust indexer needs its own database or schema, and parity must count per `program_id`.
+- The old `data-api` URL kept "alive as-is" tells a contradictory story (41 receipts, `chainReady:false`, 1.2M-slot lag, program `5o8E…`); either redirect it or have it serve a `predecessor, read-only, program 5o8E…` label in its JSON. Its `chainReady` is `indexer.chainReady || lag <= 128`, the "boolean someone sets" pattern `docs/07` forbids.
+
 ## Consequences
 
 The existing services are treated as read-only evidence and as a source of devnet facts (mints, pools, operator pubkeys). No Gate B code imports from `kunaldrall29/markov`. The Telegram bot token and the `2fpQ…` deployer stay where they are until the new services are ready to take over, and the emergency key for Gate B is a **new** keypair generated per `docs/14` §5.

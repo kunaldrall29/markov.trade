@@ -42,8 +42,18 @@ Engineering pack v0.2 (adopted 2026-09-01) does not change this: its `CORRECTION
 
 Regardless of A or B: `docs/10-PROGRAM-SPEC.md` §1, §2, §4 and `CORRECTIONS.md` must be amended to the chain's names and numbering **before P02 starts**, and `docs/11` §4 / the guard fixtures / `docs/12` schema must use `Unauthorized` and `ProgramNotAllowed`, not the pack's invented names.
 
+## Verification pass (2026-09-01)
+
+- **The Mandate account has 154 bytes of unnamed slack** (allocated 8 + 673, serialized 519; bytes 527..681 zero on all three inspected accounts). "No reserve" was misleading: up to 154 bytes can be appended without realloc. That does not rescue B, because the spec's layout changes are far larger than 154 bytes and reorder existing fields.
+- **B's real cost was understated.** A new layout means the new binary cannot deserialize the 20 existing mandates, so `owner_withdraw` on their vaults dies unless every owner path uses `Migration<From, To>` or a legacy withdraw instruction is kept forever. That is a non-negotiable #3 violation, not a migration for throwaway accounts — and it is the strongest argument for A.
+- **A is not key-free either.** A successor deploy needs a funded deployer (~3 SOL of rent for a 400 KB program; the faucet refused this box twice; `2fpQ…` holds 6.75 SOL), and `2fpQ…` is also the **mint and freeze authority of USDC-d `6eDV…`**, so a fresh demo owner needs USDC-d from a new mint (labelled as such) or a transfer from a holder whose key custody is equally unknown. Input #1 therefore decides the mint and the funding, not just the program.
+- **Continuity must be provable, not asserted.** With B15 banning "all eleven", the historical reasons are provable only if the feed carries a `program_id` per row and a per-row explorer link that resolves to the right program; index both program IDs (two IDLs, one receipts table with a program column). Publish the successor's IDL on chain (`anchor idl init`) so `ActionRefused` decodes on the explorer the tape links to. Surface the predecessor ID and handover slot on `/v1/facts` and a footer line on `/book`, since markovhq.com's litepaper names `5o8E…`.
+- **Decide the event mechanism here.** `emit_cpi` puts the payload in a self-CPI's instruction data (survives log truncation) but forces `getTransaction`-per-signature ingestion on an RPC that already 429s; `emit!` keeps `logsSubscribe` + backfill. The successor should choose with P09 in the room.
+- Verifiable build (see ADR-001) so the successor's on-chain hash ties to a commit.
+
 ## Open inputs from Kunal
 
-1. Do you hold `keys/deployer.json` (`2fpQ…`)? If not, B is impossible and A is the decision by default.
-2. Is `execute_swap` / `demo_swap` history worth keeping in the public feed, or does Gate B's feed start at the successor's first slot?
+1. Do you hold `keys/deployer.json` (`2fpQ…`)? If not, B is impossible and A is the decision by default — and a new USDC-d mint plus a funded deployer are required.
+2. Is `execute_swap` / `demo_swap` history worth keeping in the public feed? Recommendation: yes, indexed under its own `program_id` (see above), rather than starting the feed at the successor's first slot.
 3. Confirm that the six appended reason names above are the ones you want; they cannot change after first emit.
+4. Funding source for the successor deploy and the P02–P04 redeploys (devnet SOL) given the faucet refusal.

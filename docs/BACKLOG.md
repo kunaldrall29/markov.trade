@@ -6,7 +6,12 @@ Things noticed and deliberately not done, with one line of why. Each entry says 
 
 | Item | Why not now | To start |
 |---|---|---|
-| `docs/10-PROGRAM-SPEC.md` §1/§2/§4 and `docs/11` §4, `docs/12` §2 use `NotOperator` / `VenueNotAllowed` and number `Paused`=0; the chain says `Unauthorized` / `ProgramNotAllowed` and `OverTxCap`=0 | Session 0 is no-code and the spec edit is ADR-004's consequence | ADR-004 accepted |
+| `docs/10-PROGRAM-SPEC.md` §1/§2/§4 and `CORRECTIONS.md` use `NotOperator` / `VenueNotAllowed` and number `Paused`=0; the chain says `Unauthorized` / `ProgramNotAllowed` and `OverTxCap`=0 (`docs/11` §4 and `docs/12` §2 use only the names that agree, plus the new ones) | Session 0 is no-code and the spec edit is ADR-004's consequence | ADR-004 accepted |
+| Successor program: publish the IDL on chain (`anchor idl init`), carry `program_id` on every receipt row with a per-row explorer link, and produce a verifiable build whose hash goes into FACTS and `/v1/facts` | proof-chain requirements surfaced by the truth judge; P02/P09/P15 work | P02 |
+| `/v1/book/stats` needs `mark.max_age_slots` (or seconds) and `circuit` must flip to `stale_mark` at that value, so the mark-age chip shows the threshold next to the age | API shape, P10 | P10 |
+| Default hosts (`<project>.vercel.app`, `*.up.railway.app`) are public origins the incognito pass never opens; add deployment protection or redirects, or list them in FACTS | hosting, D1 | ADR-002 accepted |
+| Program-side mark binding tests: `wrong_owner_mark_refused`, `wrong_feed_mark_refused`, `partial_verification_mark_refused`; stale Pyth shards 1–2 as `StaleOracle` fixtures | P02/P04 test list addition | P02 |
+| Old `data-api` URL should redirect or label itself `predecessor, read-only, program 5o8E…`; Rust indexer needs its own schema/database next to the TS tables; parity counts per `program_id` | ADR-005 consequences | ADR-005 accepted |
 | `docs/08` §1 and §3 quote stale versions (Anchor 1.0.x; Pyth SDK "up to 0.31.1") and an unauthenticated Hermes | same; recorded in FACTS with today's values | ADR-001 / ADR-003 accepted |
 | Existing Railway `api` service holds `EMERGENCY_KEY_JSON` and signs house-operator actions from `keys/*.json` on disk; violates `docs/14` §2 for the old stack | old stack is not Gate B's; must not be inherited | P07/P13 create fresh keys in separate services |
 | Existing TS indexer stalled at lag ≈ 1.2M slots with `chainReady:false`; public feed shows stale counts | not Gate B code; restarting it changes a live property Kunal did not ask to touch | Kunal says so, or ADR-005 picks reuse |
