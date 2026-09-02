@@ -148,7 +148,7 @@ Rules: one file per calendar day, written even when the day is boring or bad. A 
 | `TICK_SECONDS` | 60 | hard floor 60 in Gate B; a lower value refuses to boot |
 | `MAX_ACTIONS_PER_HOUR` | 6 | exceeding it halts the agent and pages |
 | `DAILY_LOSS_HALT_BPS` | 500 | 5% |
-| `MARK_MAX_AGE_SLOTS` | 150 | must be ≤ the on-chain policy value. Wall-clock meaning comes from measured devnet slot time in FACTS |
+| `MARK_MAX_AGE_SECS` | 150 | seconds since the mark's `publish_time` (ADR-003, 2026-09-02: seconds, not slots — devnet pacing is ≈165 ms/slot); must be ≤ the on-chain policy value |
 | `REDTEAM_ENABLED` | false | true only on the devnet agent |
 | `SIDECAR` | `stub` | `stub` returns `chop`; any other value must be declared in FACTS |
 

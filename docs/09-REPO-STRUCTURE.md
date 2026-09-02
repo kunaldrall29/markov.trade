@@ -130,7 +130,9 @@ markov-book/
 | `OPERATOR_KEYPAIR` | agent only | base58 or file path; never in bot/api |
 | `EMERGENCY_KEYPAIR` | bot service only | never in agent |
 | `OWNER_DEMO_KEYPAIR` | demo scripts only | for the recorded tape |
-| `MARK_SOURCE` | agent, paper | `hermes` \| `onchain` \| `replay` |
+| `MARK_SOURCE` | agent, paper | `onchain` \| `house` \| `replay` (ADR-003; `hermes` needs a key and is not a Gate B path) |
+| `PYTH_PRICE_UPDATE_ACCOUNT`, `MARK_MAX_AGE_SECS` | agent, paper, program policy | from FACTS; freshness is in seconds (ADR-003) |
+| `PER_TX_CAP`, `MAX_TICKS`, `PAPER_DIR`, `PAPER_START_DATE` | agent, paper | `PAPER_START_DATE` is required in shadow mode and comes from FACTS, never edited |
 | `HERMES_URL`, `HERMES_API_KEY`, `SOL_USD_FEED_ID` | agent, paper | from FACTS. Key required after 26 Aug 2026 Pyth cutover. Empty key + `MARK_SOURCE=hermes` must refuse to boot |
 | `TICK_SECONDS` | agent | default 60, floor 60 in Gate B |
 | `REDTEAM_ENABLED`, `REDTEAM_CRON` | agent | off in `shadow` |

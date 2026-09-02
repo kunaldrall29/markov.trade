@@ -10,3 +10,9 @@ keys
 scripts
 .github
 *.md
+.env
+.env.*
+!.env.example
+**/secrets/
+*.json.key
+**/*-keypair.json

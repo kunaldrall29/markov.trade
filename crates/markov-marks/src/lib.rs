@@ -12,6 +12,8 @@ use std::future::Future;
 
 /// Pyth receiver program on devnet and mainnet (docs/FACTS.md PYTH_RECEIVER_PROGRAM).
 pub const PYTH_RECEIVER_PROGRAM: &str = "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ";
+/// Anchor account discriminator of `PriceUpdateV2`: `sha256("account:PriceUpdateV2")[..8]`.
+pub const PRICE_UPDATE_V2_DISCRIMINATOR: [u8; 8] = [34, 241, 35, 99, 157, 126, 244, 205];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Mark {
@@ -30,7 +32,7 @@ impl Mark {
         self.price as f64 * 10f64.powi(self.exponent)
     }
     pub fn age_secs(&self, now_unix: i64) -> i64 {
-        now_unix - self.publish_time
+        now_unix.saturating_sub(self.publish_time)
     }
     pub fn age_slots(&self) -> u64 {
         self.observed_slot.saturating_sub(self.posted_slot)
@@ -79,6 +81,9 @@ pub struct PriceUpdateV2 {
 }
 
 pub fn decode_price_update_v2(data: &[u8]) -> Result<PriceUpdateV2, MarkError> {
+    if data.get(..8) != Some(&PRICE_UPDATE_V2_DISCRIMINATOR[..]) {
+        return Err(MarkError::Malformed("discriminator"));
+    }
     let mut o = 8usize + 32; // discriminator + write_authority
     let tag = *data
         .get(o)
@@ -271,9 +276,12 @@ impl MarkSource for OnchainPyth {
             Err(MarkError::Rpc(e)) => match &self.fallback_url {
                 Some(fb) if fb != &self.rpc_url => {
                     let fb = fb.clone();
-                    self.fetch_from(&fb)
-                        .await
-                        .map_err(|e2| MarkError::Rpc(format!("primary: {e}; fallback: {e2}")))
+                    // A binding refusal from the fallback stays a binding refusal;
+                    // only an RPC failure is folded into the RPC error.
+                    self.fetch_from(&fb).await.map_err(|e2| match e2 {
+                        MarkError::Rpc(f) => MarkError::Rpc(format!("primary: {e}; fallback: {f}")),
+                        other => other,
+                    })
                 }
                 _ => Err(MarkError::Rpc(e)),
             },
@@ -320,7 +328,7 @@ mod tests {
         publish: i64,
         slot: u64,
     ) -> Vec<u8> {
-        let mut v = vec![0u8; 8]; // discriminator
+        let mut v = PRICE_UPDATE_V2_DISCRIMINATOR.to_vec();
         v.extend_from_slice(&[7u8; 32]); // write_authority
         if full {
             v.push(1);
@@ -399,5 +407,29 @@ mod tests {
         assert_eq!(parse_feed_id(s).unwrap()[0], 0xef);
         assert_eq!(parse_feed_id(&format!("0x{s}")).unwrap()[31], 0x6d);
         assert!(parse_feed_id("abc").is_err());
+    }
+
+    #[test]
+    fn wrong_discriminator_is_refused_before_any_field_is_read() {
+        let mut bytes = encode(true, FEED, 1, -8, 1, 1);
+        bytes[0] ^= 0xff;
+        assert!(matches!(
+            decode_price_update_v2(&bytes),
+            Err(MarkError::Malformed("discriminator"))
+        ));
+    }
+
+    #[test]
+    fn age_never_overflows() {
+        let m = Mark {
+            price: 1,
+            conf: 1,
+            exponent: -8,
+            publish_time: i64::MIN,
+            posted_slot: 1,
+            observed_slot: 1,
+            source: "replay",
+        };
+        assert_eq!(m.age_secs(0), i64::MAX);
     }
 }

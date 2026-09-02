@@ -6,7 +6,7 @@ use markov_marks::{MarkError, MarkSource};
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
-use crate::regime::{RegimeSource, StubSidecar};
+use crate::sidecar::{RegimeSource, StubSidecar};
 
 /// One row per tick, including the boring ones. This is the paper file's
 /// only input and it is never edited after being written.
@@ -29,14 +29,12 @@ pub struct TickRecord {
     pub error: Option<String>,
 }
 
-pub async fn run_tick<S: MarkSource>(
-    cfg: &Config,
-    source: &mut S,
-    now: DateTime<Utc>,
-    n: u64,
-) -> TickRecord {
+pub async fn run_tick<S: MarkSource>(cfg: &Config, source: &mut S, n: u64) -> TickRecord {
     let t0 = std::time::Instant::now();
     let mark = source.get().await;
+    // `now` is taken after the fetch so a mark published during the RPC round
+    // trip cannot show a negative age.
+    let now: DateTime<Utc> = Utc::now();
     let feats = StubSidecar.features();
     let intent = crate::core::propose(&feats);
     let state = GuardState {

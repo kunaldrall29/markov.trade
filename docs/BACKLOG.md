@@ -15,6 +15,10 @@ Things noticed and deliberately not done, with one line of why. Each entry says 
 | Bisect why a `.railwayignore` makes `railway up` builds fail instantly with no log (FACTS `RAILWAY_LESSONS` 1); until then uploads carry the 37 MB web app | not blocking; upload works without it | P14 |
 | Hosted paper files live on the Railway volume with no reader; `/v1/paper` (P10) should serve them and `scripts/paper-pull.sh` should sync them into `paper/` so one runner becomes canonical and the local box can stop | P10 owns the API | P10 |
 | `book-one` has no `/health` endpoint, so Railway cannot healthcheck it and P07's Railway definition will need one | P07 deliverable | P07 |
+| P08 deliverables `/v1/paper` (serve the folder) and `/paper` page (render it) are not built; `apps/web` `/paper` shows sample data | API is P10, page is P11 | P10, P11 |
+| CI is a subset of `docs/15` §3: no eslint (apps/web's config is the Grok builder's), no Playwright, Lighthouse, parity-check, link-check; `scripts/idl-append-only.sh` is a stub referenced by `program.yml` | P14 owns truth tooling | P14 |
+| `docs/09` §1 tree: `scripts/parity-check.rs`, `gate-b-verify.sh`, `redteam-tick.sh`, `keys/derive-pubkeys.sh`, six runbooks, `docs/demo/GATE-B.md` are placeholders or absent | their prompts create them | P14, P15 |
+| Tick jitter is a hash of the timestamp, not random; a fleet would still correlate | P07 scheduler | P07 |
 | Hosted runner runs as root (`RAILWAY_RUN_UID=0`) because the volume mounts root-owned; fine for shadow mode with no keys, must be revisited before the devnet agent holds the operator key | key custody, P07 | P07 |
 | `docs/08` §1 and §3 quote stale versions (Anchor 1.0.x; Pyth SDK "up to 0.31.1") and an unauthenticated Hermes | same; recorded in FACTS with today's values | ADR-001 / ADR-003 accepted |
 | Existing Railway `api` service holds `EMERGENCY_KEY_JSON` and signs house-operator actions from `keys/*.json` on disk; violates `docs/14` §2 for the old stack | old stack is not Gate B's; must not be inherited | P07/P13 create fresh keys in separate services |

@@ -11,7 +11,8 @@ set -uo pipefail
 hits=0
 while IFS= read -r f; do
   case "$f" in *.png|*.jpg|*.mp4|*.pdf|*.zip|*.lock|package-lock.json|pnpm-lock.yaml) continue;; esac
-  if grep -Eq '\[\s*([0-9]{1,3}\s*,\s*){63}[0-9]{1,3}\s*\]' "$f" 2>/dev/null; then echo "keypair-shaped byte array in $f"; hits=1; fi
+  if tr -d '\n\r' < "$f" 2>/dev/null | grep -Eq '\[\s*([0-9]{1,3}\s*,\s*){63}[0-9]{1,3}\s*\]'; then echo "keypair-shaped byte array in $f"; hits=1; fi
+  if grep -Eq '_KEYPAIR\s*=\s*[1-9A-HJ-NP-Za-km-z]{80,90}' "$f" 2>/dev/null; then echo "base58 keypair assigned to a *_KEYPAIR variable in $f"; hits=1; fi
   if grep -Eiq '"?(secretKey|secret_key|private_key|privateKey)"?\s*[:=]\s*"?[A-Za-z0-9+/=_-]{40,}' "$f" 2>/dev/null; then echo "secret-key field in $f"; hits=1; fi
   if grep -Eq 'BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY' "$f" 2>/dev/null; then echo "PEM private key in $f"; hits=1; fi
 done < <(git ls-files)

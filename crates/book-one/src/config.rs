@@ -66,6 +66,9 @@ impl Config {
         let paper_start_date = env("PAPER_START_DATE")
             .map(|v| chrono::NaiveDate::parse_from_str(&v, "%Y-%m-%d"))
             .transpose()?;
+        if venue == Venue::Shadow && paper_start_date.is_none() {
+            anyhow::bail!("PAPER_START_DATE is required in shadow mode (docs/FACTS.md PAPER_START_DATE, never edited); without it missing days could be silently omitted");
+        }
         Ok(Config {
             venue,
             tick_seconds,

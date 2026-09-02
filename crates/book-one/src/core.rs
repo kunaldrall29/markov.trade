@@ -4,7 +4,7 @@
 
 use markov_guard::Intent;
 
-use crate::regime::Features;
+use crate::sidecar::Features;
 
 pub fn propose(_feats: &Features) -> Intent {
     Intent::SKIP
