@@ -64,6 +64,12 @@ pub const GATE_B_DAILY_CAP: u64 = 200 * E6;
 pub const GATE_B_DELTA_BAND: u128 = 20 * E6 as u128;
 pub const GATE_B_MAX_GROSS: u128 = 100 * E6 as u128;
 pub const GATE_B_MAX_SLIPPAGE_BPS: u16 = 50;
+/// The spend budgets in the deployed template. Smaller than the notional caps
+/// because a Gate B venue takes no custody, so an action's "spend" is fees and
+/// data, not collateral.
+pub const GATE_B_SPEND_PER_CALL: u64 = E6;
+pub const GATE_B_SPEND_DAILY: u64 = 5 * E6;
+pub const GATE_B_MAX_MARK_AGE_SECS: i64 = 150;
 /// Stop for the day once equity is 5% below the session's start.
 pub const GATE_B_DAILY_LOSS_BPS: u16 = 500;
 
@@ -154,11 +160,11 @@ impl Config {
             spend_cap: env("SPEND_CAP")
                 .map(|v| v.parse())
                 .transpose()?
-                .unwrap_or(GATE_B_PER_TX_CAP),
+                .unwrap_or(GATE_B_SPEND_PER_CALL),
             spend_daily_cap: env("SPEND_DAILY_CAP")
                 .map(|v| v.parse())
                 .transpose()?
-                .unwrap_or(GATE_B_DAILY_CAP),
+                .unwrap_or(GATE_B_SPEND_DAILY),
             max_slippage_bps: env("MAX_SLIPPAGE_BPS")
                 .map(|v| v.parse())
                 .transpose()?

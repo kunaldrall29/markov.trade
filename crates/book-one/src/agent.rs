@@ -47,6 +47,8 @@ pub struct Agent {
     /// still get distinct ids when they are genuinely distinct attempts.
     pub nonce: u64,
     pub attempts: u32,
+    /// The Pyth feed the venue's mark must carry, for the relay.
+    pub feed_id: [u8; 32],
 }
 
 impl Agent {
@@ -86,9 +88,19 @@ impl Agent {
             );
             self.governor.record(now_unix);
             Metrics::incr(&self.metrics.submissions_total);
-            let sent = self
-                .submitter
-                .submit(&self.chain, &program_intent, None, self.attempts);
+            // Refresh the venue's mark in the same transaction. The venue
+            // enforces its own freshness and nothing else refreshes it, so
+            // without this the venue refuses every action with `StaleMark` —
+            // correctly, and uselessly. Measured on devnet before this
+            // existed: signature 27V1KwrsmNuJuv7WqEpsULZo…, `VenueRejected`.
+            let relay = self.submitter.mark_relay_instruction(self.feed_id);
+            let sent = self.submitter.submit(
+                &self.chain,
+                &program_intent,
+                None,
+                Some(relay),
+                self.attempts,
+            );
             self.write_outcome(sent, record, None);
             return;
         }
@@ -142,9 +154,15 @@ impl Agent {
         record.redteam_probe = Some(probe.name().to_string());
         Metrics::incr(&self.metrics.redteam_probes_total);
         Metrics::incr(&self.metrics.submissions_total);
-        let sent =
-            self.submitter
-                .submit(&self.chain, &program_intent, override_mark, self.attempts);
+        // A probe is refused by the mandate's own ladder before the CPI, so it
+        // never reaches the venue and needs no mark relay.
+        let sent = self.submitter.submit(
+            &self.chain,
+            &program_intent,
+            override_mark,
+            None,
+            self.attempts,
+        );
         self.write_outcome(sent, record, Some(probe));
     }
 
@@ -187,17 +205,25 @@ impl Agent {
                         }
                     }
                     (Some(got), None) => {
-                        // The guard allowed this and the program refused it.
-                        // One of the two is wrong about the rules, and until
-                        // that is explained every claim the tape makes is
-                        // suspect.
                         Metrics::incr(&self.metrics.refusals_total);
-                        Metrics::incr(&self.metrics.guard_divergence_total);
-                        tracing::error!(
-                            onchain_reason = got.name(),
-                            signature = %landed.signature,
-                            "GUARD DIVERGENCE: the program refused what the guard allowed"
-                        );
+                        if is_divergence(got) {
+                            // The guard allowed this and the program refused
+                            // it on a rung the guard mirrors. One of the two is
+                            // wrong about the rules, and until that is
+                            // explained every claim the tape makes is suspect.
+                            Metrics::incr(&self.metrics.guard_divergence_total);
+                            tracing::error!(
+                                onchain_reason = got.name(),
+                                signature = %landed.signature,
+                                "GUARD DIVERGENCE: the program refused what the guard allowed"
+                            );
+                        } else {
+                            tracing::info!(
+                                onchain_reason = got.name(),
+                                signature = %landed.signature,
+                                "the program refused for a reason the guard cannot mirror"
+                            );
+                        }
                     }
                     (None, Some(probe)) => {
                         tracing::error!(
@@ -216,6 +242,25 @@ impl Agent {
             }
         }
     }
+}
+
+/// Is an on-chain refusal of a guard-allowed intent a *divergence*?
+///
+/// Only for rungs the guard actually mirrors. Two are not:
+///
+/// - `VenueRejected` is the venue's own state — its mark age, its pause flag,
+///   its position cap. The guard has no view of any of that and never claimed
+///   one, so counting it would page for something nobody can fix by changing
+///   the guard.
+/// - `DuplicateIntent` means this exact intent already landed, which is
+///   success-already-happened (`docs/11` §5), not a disagreement.
+///
+/// Everything else is a real disagreement about the rules and must page.
+fn is_divergence(reason: markov_types::BlockReason) -> bool {
+    !matches!(
+        reason,
+        markov_types::BlockReason::VenueRejected | markov_types::BlockReason::DuplicateIntent
+    )
 }
 
 /// The mark this tick saw, as an integer, for building a probe's limit.
@@ -254,6 +299,41 @@ mod tests {
             withheld: None,
             onchain_reason: None,
             redteam_probe: None,
+            net_delta_e6: None,
+            gross_e6: None,
+            marked_pnl_e6: None,
+        }
+    }
+
+    /// The divergence counter must page for a rule disagreement and stay
+    /// silent for the two reasons the guard structurally cannot mirror.
+    /// Getting this wrong in either direction is bad: a false page teaches
+    /// people to ignore it, and a missed one is the whole alarm.
+    #[test]
+    fn only_a_real_rule_disagreement_is_a_divergence() {
+        use markov_types::BlockReason as R;
+        for quiet in [R::VenueRejected, R::DuplicateIntent] {
+            assert!(!is_divergence(quiet), "{quiet:?} must not page");
+        }
+        for loud in [
+            R::OverTxCap,
+            R::OverDailyCap,
+            R::OverSpendCap,
+            R::OverSpendDailyCap,
+            R::SlippageExceeded,
+            R::Paused,
+            R::Revoked,
+            R::Expired,
+            R::StaleOracle,
+            R::ActionNotAllowed,
+            R::ProgramNotAllowed,
+            R::TokenNotAllowed,
+            R::Unauthorized,
+            R::GlobalHalt,
+            R::PostCheckFailed,
+            R::ControlledAccountForwarded,
+        ] {
+            assert!(is_divergence(loud), "{loud:?} must page");
         }
     }
 

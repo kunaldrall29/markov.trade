@@ -105,12 +105,77 @@ pub fn read_mandate(
     })
 }
 
+/// The book's exposure, read from the venue.
+///
+/// Without this the core is handed a zeroed book and skips forever, which
+/// would look identical on the tape to a book with nothing to do. `None` for
+/// the position account means the mandate has never traded on this market —
+/// a fact, and a flat book, not a failure.
+pub fn read_position(chain: &Chain, position: &Pubkey) -> Result<PositionView, ChainError> {
+    let Some(account) = chain.account(position)? else {
+        return Ok(PositionView::default());
+    };
+    let p = demo_perps::Position::try_deserialize(&mut account.data.as_slice()).map_err(|e| {
+        ChainError::NotConfirmed {
+            attempts: 1,
+            last: format!("position {position} did not decode: {e}"),
+        }
+    })?;
+    let size = i128::from(p.notional);
+    let net = match p.side {
+        markov_types::Side::Long => size,
+        markov_types::Side::Short => -size,
+    };
+    Ok(PositionView {
+        net_delta: net,
+        gross: u128::from(p.notional),
+        entry_price_e6: p.entry_price,
+        funding_accrued: p.funding_accrued,
+    })
+}
+
+/// The venue position, in the shape the book and the tape need.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PositionView {
+    pub net_delta: i128,
+    pub gross: u128,
+    pub entry_price_e6: u64,
+    pub funding_accrued: i64,
+}
+
+impl PositionView {
+    /// Marked PnL in mint base units: what the position is worth at this mark
+    /// against what it was opened at, plus funding already accrued.
+    ///
+    /// **Marked, not realised.** Nothing has been closed; this is what the
+    /// book would be worth if it were. Every surface showing it must say so —
+    /// "marked PnL, not a promised rate" is the literal Gate B copy.
+    ///
+    /// `None` when there is no position or no entry price to mark against. A
+    /// zero would read as "flat and even", which is a different claim.
+    pub fn marked_pnl_e6(&self, mark_e6: u64) -> Option<i128> {
+        if self.gross == 0 || self.entry_price_e6 == 0 || mark_e6 == 0 {
+            return None;
+        }
+        let entry = i128::from(self.entry_price_e6);
+        let mark = i128::from(mark_e6);
+        // net_delta already carries the sign of the side, so a short that
+        // gains as the price falls comes out positive without a special case.
+        let move_e6 = mark.checked_sub(entry)?;
+        let pnl = self.net_delta.checked_mul(move_e6)?.checked_div(entry)?;
+        pnl.checked_add(i128::from(self.funding_accrued))
+    }
+}
+
 /// Does this mandate's policy match the Gate B template? P07's pre-flight #2.
 ///
 /// Returned as a list of differences rather than a bool, because "it does not
 /// match" is not an answer anyone can act on.
 pub fn gate_b_policy_differences(p: &PolicyView) -> Vec<String> {
-    use crate::config::{GATE_B_DAILY_CAP, GATE_B_MAX_SLIPPAGE_BPS, GATE_B_PER_TX_CAP};
+    use crate::config::{
+        GATE_B_DAILY_CAP, GATE_B_MAX_MARK_AGE_SECS, GATE_B_MAX_SLIPPAGE_BPS, GATE_B_PER_TX_CAP,
+        GATE_B_SPEND_DAILY, GATE_B_SPEND_PER_CALL,
+    };
     let mut out = Vec::new();
     let mut check = |name: &str, got: u64, want: u64| {
         if got != want {
@@ -119,10 +184,17 @@ pub fn gate_b_policy_differences(p: &PolicyView) -> Vec<String> {
     };
     check("per_tx_cap", p.per_tx_cap, GATE_B_PER_TX_CAP);
     check("daily_cap", p.daily_cap, GATE_B_DAILY_CAP);
+    check("spend_per_call", p.spend_cap, GATE_B_SPEND_PER_CALL);
+    check("spend_daily", p.spend_daily_cap, GATE_B_SPEND_DAILY);
     check(
         "max_slippage_bps",
         u64::from(p.max_slippage_bps),
         u64::from(GATE_B_MAX_SLIPPAGE_BPS),
+    );
+    check(
+        "max_mark_age_secs",
+        p.max_mark_age_secs.unsigned_abs(),
+        GATE_B_MAX_MARK_AGE_SECS.unsigned_abs(),
     );
     out
 }
@@ -154,8 +226,8 @@ mod tests {
             allowed_actions: 62,
             per_tx_cap: GATE_B_PER_TX_CAP,
             daily_cap: GATE_B_DAILY_CAP,
-            spend_cap: GATE_B_PER_TX_CAP,
-            spend_daily_cap: GATE_B_DAILY_CAP,
+            spend_cap: crate::config::GATE_B_SPEND_PER_CALL,
+            spend_daily_cap: crate::config::GATE_B_SPEND_DAILY,
             max_slippage_bps: GATE_B_MAX_SLIPPAGE_BPS,
             delta_band: 20_000_000,
             max_gross: 100_000_000,
@@ -181,6 +253,48 @@ mod tests {
         for state in [MandateState::Paused, MandateState::Revoked] {
             assert_eq!(snapshot(state, 1).state_at(9_999), state);
         }
+    }
+
+    /// Marked PnL is signed correctly for both sides, and absent rather than
+    /// zero when there is nothing to mark.
+    #[test]
+    fn marked_pnl_is_signed_by_side_and_absent_when_flat() {
+        let long = PositionView {
+            net_delta: 40_000_000,
+            gross: 40_000_000,
+            entry_price_e6: 100_000_000,
+            funding_accrued: 0,
+        };
+        // Up 1%: a long gains 1% of 40, which is 0.4.
+        assert_eq!(long.marked_pnl_e6(101_000_000), Some(400_000));
+        assert_eq!(long.marked_pnl_e6(99_000_000), Some(-400_000));
+
+        let short = PositionView {
+            net_delta: -40_000_000,
+            ..long
+        };
+        assert_eq!(short.marked_pnl_e6(101_000_000), Some(-400_000));
+        assert_eq!(short.marked_pnl_e6(99_000_000), Some(400_000));
+
+        // Funding is part of what the book is worth.
+        let funded = PositionView {
+            funding_accrued: -1_000,
+            ..long
+        };
+        assert_eq!(funded.marked_pnl_e6(101_000_000), Some(399_000));
+
+        // Nothing to mark is None, not zero: "flat and even" is a different
+        // claim from "no position".
+        assert_eq!(PositionView::default().marked_pnl_e6(100_000_000), None);
+        assert_eq!(long.marked_pnl_e6(0), None, "a zero mark is not a price");
+        assert_eq!(
+            PositionView {
+                entry_price_e6: 0,
+                ..long
+            }
+            .marked_pnl_e6(100_000_000),
+            None
+        );
     }
 
     #[test]

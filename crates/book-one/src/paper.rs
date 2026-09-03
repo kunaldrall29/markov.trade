@@ -37,6 +37,14 @@ pub const SCHEMA_FIELDS: [&str; 11] = [
 /// ended; anything older is a backfill attempt and is refused.
 const LATE_TICK_GRACE_SECS: i64 = 5 * 60;
 
+/// Mint base units as dollars, with the sign kept. The mint has 6 decimals,
+/// so this is the one place that division lives.
+fn usd(base_units: i128) -> String {
+    let whole = base_units / 1_000_000;
+    let frac = (base_units % 1_000_000).unsigned_abs();
+    format!("{whole}.{frac:06}")
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum PaperError {
     #[error("refusing to backfill: tick for {day} recorded on {today}")]
@@ -299,15 +307,38 @@ pub fn render(
         }
     }
 
-    // Fail closed: until P06/P07 supply positions and PnL, a day with intents
-    // has no honest hedge-error or marked-return line, so no file is rendered.
-    if proposed > 0 || would_send > 0 {
+    // Fail closed, still: a day with intents must carry the book's own numbers
+    // or no file is rendered. What changed in P07 is that the numbers now
+    // exist — the tick row carries the position and its marked PnL, read from
+    // the venue. A day that proposed something but recorded no book is a day
+    // whose hedge-error and marked-return lines would be invented, and that is
+    // exactly what this refuses.
+    let with_book: Vec<&TickRecord> = ticks.iter().filter(|t| t.gross_e6.is_some()).collect();
+    if (proposed > 0 || would_send > 0) && with_book.is_empty() {
         return Err(PaperError::PlaceholderPnl {
             day,
             intents: proposed,
             would_send,
         });
     }
+
+    // Hedge error is the distance from the book's target, which is flat: the
+    // mean and max of |net delta| over the ticks that carried a book.
+    let deltas: Vec<i128> = with_book.iter().filter_map(|t| t.net_delta_e6).collect();
+    let (hedge_mean, hedge_max) = if deltas.is_empty() {
+        ("—".to_string(), "—".to_string())
+    } else {
+        let mean = deltas.iter().map(|d| d.unsigned_abs()).sum::<u128>() / deltas.len() as u128;
+        let max = deltas.iter().map(|d| d.unsigned_abs()).max().unwrap_or(0);
+        (usd(mean as i128), usd(max as i128))
+    };
+    // Marked return is the last mark of the day, not an average: it is what
+    // the book was worth when the tape closed.
+    let marked = with_book.iter().rev().find_map(|t| t.marked_pnl_e6);
+    let marked_line = match marked {
+        Some(pnl) => format!("{} (marked)", usd(pnl)),
+        None => "—".to_string(),
+    };
 
     let regime_line = ["chop", "trend", "halt"]
         .iter()
@@ -381,7 +412,18 @@ pub fn render(
     if log.unparseable > 0 {
         notes.push(format!("{} unparseable tick rows skipped", log.unparseable));
     }
-    notes.push("core is the P06 placeholder (always skip); no positions, so hedge error and marked return are not computed".to_string());
+    if with_book.is_empty() {
+        notes.push(
+            "shadow mode: no mandate and no position, so hedge error and marked return are not computed"
+                .to_string(),
+        );
+    } else {
+        notes.push(format!(
+            "book read from the venue on {} of {} ticks; marked PnL is unrealised — nothing was closed",
+            with_book.len(),
+            ticks.len()
+        ));
+    }
 
     Ok(format!(
         "date: {date}\n\
@@ -390,10 +432,15 @@ pub fn render(
          regime counts: {regime_line}\n\
          proposed: {proposed}   skipped: {skipped}   would_send: {would_send}   vetoed: {vetoed}\n\
          veto reasons: {veto_line}\n\
-         hedge error (mean |target-actual| delta, USD): —   max: —\n\
-         daily loss halt: no (no positions)\n\
-         marked return: —          <- marked, devnet-shaped, not a rate\n\
+         hedge error (mean |target-actual| delta, USD): {hedge_mean}   max: {hedge_max}\n\
+         daily loss halt: {halt_line}\n\
+         marked return: {marked_line}          <- marked, devnet-shaped, not a rate\n\
          notes: {notes}\n",
+        halt_line = if with_book.is_empty() {
+            "no (no positions)".to_string()
+        } else {
+            format!("no ({} ticks with a book)", with_book.len())
+        },
         date = day.format("%Y-%m-%d"),
         started = hhmm(first),
         ended = hhmm(last),
@@ -436,6 +483,9 @@ mod tests {
             withheld: None,
             onchain_reason: None,
             redteam_probe: None,
+            net_delta_e6: None,
+            gross_e6: None,
+            marked_pnl_e6: None,
             latency_ms: 5,
             error: None,
         }

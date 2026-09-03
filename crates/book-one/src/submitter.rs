@@ -33,7 +33,16 @@ use solana_transaction::Transaction;
 ///
 /// One entry, and the test below proves the list is not a comment: it scans
 /// the crate's own source for the owner verbs.
-pub const BUILDABLE_INSTRUCTIONS: &[&str] = &["execute_venue_action"];
+pub const BUILDABLE_INSTRUCTIONS: &[&str] = &[
+    "execute_venue_action",
+    // The venue's mark relay. It takes no signer, moves nothing, and writes a
+    // price the Pyth receiver has already verified onto the venue's own mark
+    // account — the venue would otherwise refuse every action for a stale mark
+    // that nobody was refreshing. It is bundled into the same transaction as
+    // the action so the mark the venue prices against is the one this tick
+    // read, and so a tick is still one transaction.
+    "demo_perps::post_mark_from_pyth",
+];
 
 /// Instructions the agent must never be able to build, whatever happens to its
 /// key. `docs/14` §2 and the P07 hard constraint.
@@ -65,6 +74,11 @@ pub struct Wiring {
     /// refusal on the tape.
     pub venue_accounts: Vec<AccountMeta>,
     pub market_id: [u8; 16],
+    /// The venue's own market and mark accounts, for the mark relay.
+    pub venue_market: Pubkey,
+    pub venue_mark: Pubkey,
+    /// The Pyth feed the venue's mark must carry.
+    pub feed_id: [u8; 32],
 }
 
 impl Wiring {
@@ -108,9 +122,42 @@ impl Submitter {
     /// what it had was a missing credential.
     pub fn new(operator_key_path: &str, wiring: Wiring) -> anyhow::Result<Submitter> {
         wiring.validate().map_err(|e| anyhow::anyhow!(e))?;
-        let operator = read_keypair_file(operator_key_path)
-            .map_err(|e| anyhow::anyhow!("operator key {operator_key_path}: {e}"))?;
+        // `docs/14` §2 puts the operator key in this service's environment, so
+        // the hosted agent has one and a local run reads a file. Whichever it
+        // is, it is loaded once here and never again: a key re-read per tick is
+        // a key that can change under the process.
+        let operator = match std::env::var("OPERATOR_KEY_JSON") {
+            Ok(json) if !json.trim().is_empty() => {
+                let bytes: Vec<u8> = serde_json::from_str(&json).map_err(|e| {
+                    anyhow::anyhow!("OPERATOR_KEY_JSON is not a keypair array: {e}")
+                })?;
+                Keypair::try_from(bytes.as_slice())
+                    .map_err(|e| anyhow::anyhow!("OPERATOR_KEY_JSON: {e}"))?
+            }
+            _ => read_keypair_file(operator_key_path)
+                .map_err(|e| anyhow::anyhow!("operator key {operator_key_path}: {e}"))?,
+        };
         Ok(Submitter { operator, wiring })
+    }
+
+    /// The keys this process must **not** be able to read (`docs/14` §2:
+    /// separation is deployment-level, not comment-level). Checked at boot so
+    /// a misconfigured deployment refuses to run rather than running with more
+    /// authority than it should have.
+    pub const FORBIDDEN_KEY_VARS: &'static [&'static str] = &[
+        "EMERGENCY_KEY_JSON",
+        "OWNER_KEY_JSON",
+        "DEPLOYER_KEY_JSON",
+        "UPGRADE_AUTHORITY_KEY_JSON",
+    ];
+
+    /// Any forbidden key material visible to this process, by name.
+    pub fn forbidden_keys_present() -> Vec<&'static str> {
+        Self::FORBIDDEN_KEY_VARS
+            .iter()
+            .copied()
+            .filter(|v| std::env::var(v).is_ok_and(|s| !s.trim().is_empty()))
+            .collect()
     }
 
     pub fn operator(&self) -> Pubkey {
@@ -154,12 +201,36 @@ impl Submitter {
         }
     }
 
+    /// Relay the Pyth price onto the venue's own mark account.
+    ///
+    /// The venue enforces its own freshness, independently of the mandate
+    /// (ADR-003), and nothing else refreshes it. Without this every action
+    /// reaches the venue and comes back `StaleMark` — which is a correct
+    /// refusal, committed as a receipt, and completely useless.
+    pub fn mark_relay_instruction(&self, feed_id: [u8; 32]) -> Instruction {
+        let w = &self.wiring;
+        Instruction {
+            program_id: w.venue_program,
+            accounts: vec![
+                AccountMeta::new_readonly(w.venue_market, false),
+                AccountMeta::new(w.venue_mark, false),
+                AccountMeta::new_readonly(w.price_update, false),
+            ],
+            data: demo_perps::instruction::PostMarkFromPyth { feed_id }.data(),
+        }
+    }
+
     /// Sign once, then send those exact bytes up to `attempts` times.
+    ///
+    /// `prelude` runs in the same transaction, before the action — used for
+    /// the mark relay, so the venue prices against the mark this tick read
+    /// rather than whatever was last written.
     pub fn submit(
         &self,
         chain: &Chain,
         intent: &markov_mandate::gates::Intent,
         price_update_override: Option<Pubkey>,
+        prelude: Option<Instruction>,
         attempts: u32,
     ) -> Submitted {
         let ix = self.instruction(intent, price_update_override);
@@ -167,7 +238,11 @@ impl Submitter {
             Ok(h) => h,
             Err(e) => return Submitted::Failed(format!("blockhash: {e}")),
         };
-        let message = Message::new(&[ix], Some(&self.operator.pubkey()));
+        let instructions: Vec<Instruction> = match prelude {
+            Some(p) => vec![p, ix],
+            None => vec![ix],
+        };
+        let message = Message::new(&instructions, Some(&self.operator.pubkey()));
         let tx = Transaction::new(&[&self.operator], message, blockhash);
         match chain.send_confirm(&tx, attempts) {
             Ok(landed) => Submitted::Landed(landed),
@@ -279,8 +354,8 @@ mod tests {
     fn cannot_build_owner_instructions() {
         assert_eq!(
             BUILDABLE_INSTRUCTIONS,
-            &["execute_venue_action"],
-            "the agent builds exactly one instruction"
+            &["execute_venue_action", "demo_perps::post_mark_from_pyth"],
+            "the agent builds these and nothing else"
         );
 
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
@@ -382,6 +457,30 @@ mod tests {
         assert_ne!(a, intent_id(&mandate, 1_000, &i, 8), "nonce");
     }
 
+    /// The operator service must hold the operator key and nothing else.
+    /// `docs/14` §2 calls this deployment-level separation; this is the check
+    /// that makes it so rather than saying so.
+    #[test]
+    fn the_emergency_key_must_not_be_readable_here() {
+        // SAFETY-adjacent: uniquely named vars, read only by this test.
+        for var in Submitter::FORBIDDEN_KEY_VARS {
+            unsafe { std::env::remove_var(var) };
+        }
+        assert!(Submitter::forbidden_keys_present().is_empty());
+
+        unsafe { std::env::set_var("EMERGENCY_KEY_JSON", "[1,2,3]") };
+        assert_eq!(
+            Submitter::forbidden_keys_present(),
+            vec!["EMERGENCY_KEY_JSON"],
+            "an emergency key in this environment must refuse the boot"
+        );
+        // Empty is not present: an unset-but-declared variable is common in
+        // hosting UIs and must not brick the deployment.
+        unsafe { std::env::set_var("EMERGENCY_KEY_JSON", "   ") };
+        assert!(Submitter::forbidden_keys_present().is_empty());
+        unsafe { std::env::remove_var("EMERGENCY_KEY_JSON") };
+    }
+
     /// A wiring that forwards the vault is refused at boot, not once a day on
     /// the tape.
     #[test]
@@ -399,6 +498,9 @@ mod tests {
             event_authority: Pubkey::new_unique(),
             venue_accounts: vec![AccountMeta::new(vault, false)],
             market_id: *b"SOL-PERP\0\0\0\0\0\0\0\0",
+            venue_market: Pubkey::new_unique(),
+            venue_mark: Pubkey::new_unique(),
+            feed_id: [0; 32],
         };
         assert!(
             w.validate().is_err(),

@@ -1048,6 +1048,7 @@ dependencies = [
  "anyhow",
  "blake3",
  "chrono",
+ "demo_perps",
  "markov-chain",
  "markov-guard",
  "markov-marks",

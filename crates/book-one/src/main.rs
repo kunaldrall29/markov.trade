@@ -65,7 +65,7 @@ fn main() -> ExitCode {
 fn boot_devnet(
     cfg: &config::Config,
     metrics: Arc<runtime::Metrics>,
-) -> anyhow::Result<(agent::Agent, chainstate::MandateSnapshot)> {
+) -> anyhow::Result<(agent::Agent, chainstate::MandateSnapshot, Pubkey)> {
     if cfg.mandate.trim().is_empty() {
         anyhow::bail!("VENUE=devnet needs MANDATE set to the mandate's address");
     }
@@ -132,7 +132,18 @@ fn boot_devnet(
             AccountMeta::new(venue_position, false),
         ],
         market_id: cfg.market_id,
+        venue_market,
+        venue_mark,
+        feed_id: snapshot.feed_id,
     };
+    // P07 pre-flight 1: prove the emergency key is not readable here.
+    // Separation is deployment-level, so this is a boot check, not a comment.
+    let forbidden = submitter::Submitter::forbidden_keys_present();
+    if !forbidden.is_empty() {
+        anyhow::bail!(
+            "this process can read {forbidden:?}; the operator service must hold the operator key and nothing else (docs/14 §2)"
+        );
+    }
     let sub = submitter::Submitter::new(&cfg.operator_key_path, wiring)?;
 
     let wrong_mark_account = cfg
@@ -172,8 +183,10 @@ fn boot_devnet(
             wrong_mark_account,
             nonce: 0,
             attempts: cfg.submit_attempts,
+            feed_id: snapshot.feed_id,
         },
         snapshot,
+        venue_position,
     ))
 }
 
@@ -185,10 +198,12 @@ async fn run(cfg: config::Config) -> anyhow::Result<()> {
     // Devnet mode boots its chain wiring before anything else, so a
     // misconfiguration fails loudly at start rather than as a skipped tick an
     // hour later.
+    let mut venue_position = Pubkey::default();
     let mut agent = match cfg.venue {
         config::Venue::Shadow => None,
         config::Venue::Devnet => {
-            let (a, snap) = boot_devnet(&cfg, metrics.clone())?;
+            let (a, snap, position) = boot_devnet(&cfg, metrics.clone())?;
+            venue_position = position;
             info!(state = ?snap.state, "devnet mode armed");
             Some(a)
         }
@@ -218,7 +233,10 @@ async fn run(cfg: config::Config) -> anyhow::Result<()> {
         cfg.sol_usd_feed_id,
     );
     info!(
-        venue = "shadow",
+        venue = match cfg.venue {
+            config::Venue::Shadow => "shadow",
+            config::Venue::Devnet => "devnet",
+        },
         tick_seconds = cfg.tick_seconds,
         mark_source = source.name(),
         mark_account = %cfg.pyth_price_update_account,
@@ -277,7 +295,62 @@ async fn run(cfg: config::Config) -> anyhow::Result<()> {
         tokio::time::sleep(Duration::from_millis(jitter_ms)).await;
 
         n += 1;
-        let (mut record, verdict, policy) = tick::run_tick(&cfg, &mut source, &mut book, n).await;
+
+        // Read the chain *before* proposing. The core's job is to react to the
+        // book it has, and a book read after the decision is a book the
+        // decision could not have used. The first version of this loop read
+        // the position afterwards, so every first tick proposed against zero.
+        let mut chain_view = None;
+        let mut position = None;
+        if let Some(a) = agent.as_ref() {
+            match chainstate::read_mandate(
+                &a.chain,
+                &a.submitter.wiring().mandate,
+                cfg.delta_band,
+                cfg.max_gross,
+                cfg.daily_loss_bps,
+            ) {
+                Ok(snapshot) => {
+                    match chainstate::read_position(&a.chain, &venue_position) {
+                        Ok(p) => {
+                            book.net_delta = p.net_delta;
+                            book.gross = p.gross;
+                            position = Some(p);
+                        }
+                        Err(e) => warn!(error = %e, "could not read the venue position"),
+                    }
+                    chain_view = Some((
+                        tick::ChainView {
+                            policy: snapshot.policy,
+                            state: snapshot.state_at(Utc::now().timestamp()),
+                            day_notional_used: snapshot.day_notional_used,
+                            day_spend_used: snapshot.day_spend_used,
+                        },
+                        snapshot,
+                    ));
+                }
+                Err(e) => warn!(error = %e, "could not read the mandate"),
+            }
+        }
+
+        let (mut record, verdict, policy) = tick::run_tick(
+            &cfg,
+            &mut source,
+            &mut book,
+            n,
+            chain_view.as_ref().map(|(v, _)| v),
+        )
+        .await;
+        // The tape carries the book's own numbers, so a reader does not have
+        // to take the verdict on trust: what was held, and what it was worth
+        // at this mark. Marked, never realised.
+        if let Some(p) = position {
+            record.net_delta_e6 = Some(p.net_delta);
+            record.gross_e6 = Some(p.gross);
+            record.marked_pnl_e6 = record
+                .mark_price
+                .and_then(|m| p.marked_pnl_e6((m * 1_000_000.0) as u64));
+        }
         runtime::Metrics::incr(&metrics.ticks_total);
         metrics
             .last_tick_unix
@@ -288,36 +361,25 @@ async fn run(cfg: config::Config) -> anyhow::Result<()> {
             markov_guard::Verdict::Veto(_) => runtime::Metrics::incr(&metrics.vetoes_total),
         }
 
-        if let Some(a) = agent.as_mut() {
-            // Re-read the mandate every tick: the owner may have paused,
-            // revoked or amended it since the last one, and acting on a
-            // remembered policy is acting on a policy that is not in force.
-            match chainstate::read_mandate(
-                &a.chain,
-                &a.submitter.wiring().mandate,
-                cfg.delta_band,
-                cfg.max_gross,
-                cfg.daily_loss_bps,
-            ) {
-                Ok(snapshot) => {
-                    a.act(
-                        record.ts_unix,
-                        record.slot,
-                        &snapshot,
-                        &snapshot.policy,
-                        &verdict,
-                        &mut record,
-                    );
-                }
-                Err(e) => {
-                    warn!(error = %e, "could not read the mandate; nothing submitted this tick");
-                    record.error = Some(format!("mandate read: {e}"));
-                }
+        match (agent.as_mut(), &chain_view) {
+            (Some(a), Some((_, snapshot))) => {
+                a.act(
+                    record.ts_unix,
+                    record.slot,
+                    snapshot,
+                    &policy,
+                    &verdict,
+                    &mut record,
+                );
             }
-        } else {
-            record.withheld = Some(runtime::WITHHELD_SHADOW.to_string());
+            (Some(_), None) => {
+                // The chain could not be read, so nothing is submitted. Said
+                // out loud on the tick row: a silent skip here would be
+                // indistinguishable from a quiet market.
+                record.error = Some("chain unreadable; nothing submitted".to_string());
+            }
+            (None, _) => record.withheld = Some(runtime::WITHHELD_SHADOW.to_string()),
         }
-        let _ = &policy;
         info!(
             tick_id = %record.tick_id,
             slot = record.slot,

@@ -20,6 +20,9 @@ anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 anchor-lang = "1.1.2"
 blake3 = "1"
+demo-perps = { package = "demo_perps", path = "../../programs/demo-perps", features = [
+  "no-entrypoint",
+] }
 markov-chain = { path = "../markov-chain" }
 markov-guard = { path = "../markov-guard" }
 markov-mandate = { package = "markov_mandate", path = "../../programs/markov-mandate", features = [
