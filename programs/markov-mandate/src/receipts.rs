@@ -21,7 +21,11 @@ pub struct ActionReceipt {
     pub action: u8,
     pub side: u8,
     pub notional: u64,
+    /// The price the venue reported filling at. Never a limit, never a mark:
+    /// if the venue reports no fill, no `ActionReceipt` is emitted at all.
     pub fill_price: u64,
+    /// The venue's fee on this fill, as the venue reported it.
+    pub fee: u64,
     pub mark_price: u64,
     pub mark_publish_time: i64,
     pub spend: u64,

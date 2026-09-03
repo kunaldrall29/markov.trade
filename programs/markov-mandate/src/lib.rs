@@ -402,6 +402,7 @@ pub mod markov_mandate {
             side: intent.side as u8,
             notional: intent.notional,
             limit_price: intent.limit_price,
+            max_slippage_bps: intent.max_slippage_bps,
         };
         let metas = ctx
             .remaining_accounts
@@ -445,20 +446,49 @@ pub mod markov_mandate {
             return Ok(());
         }
 
+        // The venue must say what it filled. A CPI returns no value, so this
+        // reads the fill it reported; if there is none, the program refuses
+        // rather than writing the limit price into a receipt and calling it a
+        // fill (ADR-007). Gate 13 covers this: the venue did not deliver a
+        // result we can describe.
+        let Some(fill) = cpi::venue::reported_fill(&venue) else {
+            ctx.accounts.mandate.action_seq = seq;
+            emit_cpi!(RefusalReceipt {
+                seq,
+                intent_id: intent.intent_id,
+                mandate: ctx.accounts.mandate.key(),
+                operator: signer,
+                strategy_id: ctx.accounts.mandate.strategy_id,
+                venue,
+                action: intent.action as u8,
+                notional: intent.notional,
+                reason: BlockReason::VenueRejected,
+                gate_index: 13,
+                forced: intent.forced,
+                ts: now,
+                slot: clock.slot,
+            });
+            return Ok(());
+        };
+        // A venue may fill less than asked, never more.
+        require!(fill.notional <= intent.notional, MandateError::PostCheckFailed);
+
         // Gate 14: the only refusal allowed to be an `Err`. A state we cannot
         // describe is a state we do not keep.
         ctx.accounts.vault.reload()?;
         let after = snapshot(&ctx.accounts.vault, &ctx.accounts.mandate);
         require!(
-            cpi::venue::post_checks_pass(&before, &after, intent.notional),
+            cpi::venue::post_checks_pass(&before, &after, fill.notional),
             MandateError::PostCheckFailed
         );
 
         let m = &mut ctx.accounts.mandate;
         m.action_seq = seq;
+        // The counter spends what was actually transacted, which gate 9 has
+        // already bounded because a fill can only be smaller than the intent.
         m.day_notional_used = m
             .day_notional_used
-            .checked_add(intent.notional)
+            .checked_add(fill.notional)
             .ok_or(MandateError::Math)?;
         m.day_spend_used = m
             .day_spend_used
@@ -477,8 +507,10 @@ pub mod markov_mandate {
             market: intent.market,
             action: intent.action as u8,
             side: intent.side as u8,
-            notional: intent.notional,
-            fill_price: intent.limit_price,
+            notional: fill.notional,
+            // The price the venue reported filling at — never the limit.
+            fill_price: fill.price,
+            fee: fill.fee,
             mark_price: bound.price_e6(),
             mark_publish_time: bound.publish_time,
             spend: intent.spend,

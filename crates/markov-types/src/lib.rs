@@ -162,6 +162,64 @@ impl ActionKind {
     }
 }
 
+/// What a venue write actually did, as it crosses the CPI boundary.
+///
+/// A Solana CPI cannot return a value, so a venue reports its fill with
+/// `set_return_data` and the caller reads it with `get_return_data`. This is
+/// the only way the mandate program learns a real fill price. If it is
+/// missing, the program refuses rather than filling the receipt in with the
+/// limit price — a receipt that states a price nobody traded at is a lie with
+/// a signature on it (ADR-007).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "anchor",
+    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, anchor_lang::InitSpace)
+)]
+pub struct VenueFill {
+    /// Scaled 1e6 per unit.
+    pub price: u64,
+    /// Settlement-mint base units actually transacted.
+    pub notional: u64,
+    pub fee: u64,
+}
+
+/// Where a mark came from. On chain, so the page can say it rather than guess.
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "anchor",
+    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, anchor_lang::InitSpace),
+    borsh(use_discriminant = true)
+)]
+pub enum MarkSourceKind {
+    /// Relayed from a Pyth `PriceUpdateV2` account, verified on chain.
+    Pyth = 0,
+    /// Posted by the house mark-poster. Devnet only, and the page must say so.
+    House = 1,
+}
+
+impl MarkSourceKind {
+    pub const fn name(self) -> &'static str {
+        match self {
+            MarkSourceKind::Pyth => "pyth",
+            MarkSourceKind::House => "house",
+        }
+    }
+}
+
+#[cfg(test)]
+mod venue_fill_tests {
+    use super::*;
+
+    #[test]
+    fn mark_source_names_are_what_the_api_publishes() {
+        assert_eq!(MarkSourceKind::Pyth as u8, 0);
+        assert_eq!(MarkSourceKind::House as u8, 1);
+        assert_eq!(MarkSourceKind::Pyth.name(), "pyth");
+        assert_eq!(MarkSourceKind::House.name(), "house");
+    }
+}
+
 #[cfg(test)]
 mod side_tests {
     use super::*;

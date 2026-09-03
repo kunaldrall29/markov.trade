@@ -21,6 +21,24 @@ pub struct VenueExecuteArgs {
     pub side: u8,
     pub notional: u64,
     pub limit_price: u64,
+    /// The venue enforces the bound as well. Gate 11 already checked it, but
+    /// a venue that fills outside the caller's bound has not honoured the
+    /// intent, so it is told the bound rather than trusted to infer it.
+    pub max_slippage_bps: u16,
+}
+
+/// Read the fill the venue reported with `set_return_data`.
+///
+/// A Solana CPI returns no value, so this is the only way the program learns
+/// what actually traded. `None` means the venue reported nothing — and the
+/// caller must then refuse, because the alternative is writing the limit
+/// price into a receipt and calling it a fill (ADR-007).
+pub fn reported_fill(expected_program: &Pubkey) -> Option<markov_types::VenueFill> {
+    let (program, data) = anchor_lang::solana_program::program::get_return_data()?;
+    if program != *expected_program {
+        return None;
+    }
+    markov_types::VenueFill::try_from_slice(&data).ok()
 }
 
 /// Anchor's global instruction discriminator.

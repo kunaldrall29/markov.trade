@@ -23,6 +23,10 @@ custom-panic = []
 
 [dependencies]
 anchor-lang = "1.1.2"
+markov-types = { path = "../../crates/markov-types", features = ["anchor"] }
+# ADR-003: the primary mark is relayed from a Pyth PriceUpdateV2 account and
+# verified on chain, so the venue can say where its price came from.
+pyth-solana-receiver-sdk = "2.0.0"
 
 [dev-dependencies]
 # ADR-001: start at LiteSVM 0.16.0; fall back to the Anchor 1.1.2 template pin 0.10.0 if this fails to build.

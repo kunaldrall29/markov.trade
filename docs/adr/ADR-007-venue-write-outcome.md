@@ -38,3 +38,72 @@ pub enum VenueOutcome {
 ## Amendment to the spec
 
 `docs/10-PROGRAM-SPEC.md` §6's bullet is amended to: "Every write reports what happened — a `Fill` the program can post-check, or an accepted request carrying no price. It may never invent a fill."
+
+## Evidence from real venues (research completed 2026-09-02, after the decision)
+
+A three-agent study of how Solana perp venues are actually called came back
+*after* this ADR was written, from IDLs, endorsed parsing repos and official
+docs. It confirms the decision on stronger grounds than the reasoning above,
+and finds three further things this ADR did not anticipate.
+
+**Confirmed — a `-> Fill` return is impossible on a request/fulfilment venue.**
+Jupiter Perpetuals (`PERPHjGBqRHArX4DySjwM6UJHiR3sWAatqfdBS2qQJu`): not one
+write instruction in its IDL carries a `returns` type — only the three
+read-only `get*` instructions do — so there is no return data a CPI caller
+could read. The fill fields exist **only** in an `IncreasePositionEvent`
+emitted by the *keeper's* transaction (`increasePosition4`), not by the
+owner's `createIncreasePositionMarketRequest`. Official docs: "two
+transactions required to complete a trade request", and a request unexecuted
+after 45 seconds "is considered stale and will be rejected".
+
+**Confirmed — a synchronous fill still may not be returnable.** Drift v2
+`place_and_take_perp_order` genuinely fills inside one instruction but returns
+nothing to the caller. So `Filled(Fill)` is only obtainable when the venue
+*chooses* to report it. `demo_perps` reports its fill with `set_return_data`;
+the mandate program refuses to emit an `ActionReceipt` when no fill is
+reported, rather than substituting the limit price.
+
+**New: a fixed six-error enum cannot express "accepted, outcome pending".**
+Jupiter's `ExceedExecutionPeriod` (the 45-second staleness) maps to none of the
+six, and — decisively — *these errors surface in the keeper's transaction, not
+the caller's*. A CPI that files a request returns `Ok`, and the trade can still
+be rejected seconds later with nothing propagated back. Gate 13 therefore
+cannot see such a refusal at all.
+
+**New: the "nothing moves tokens without the mandate program authorising it"
+rule is dented by escrow.** On Jupiter, collateral moves owner ATA →
+`positionRequestAta` (a PDA of the perps program) → collateral custody at
+*request* time. Between request and fulfilment the funds sit where the mandate
+program cannot reach them, and only a keeper can spend them or return them
+(`closePositionRequest2` is keeper-signed, owner not a signer) — so the mandate
+could not abort its own escrowed order. The mandate authorises the escrow, not
+the fill. That is a materially weaker guarantee than Gate B's, and it must be
+stated plainly before any such venue is adopted, not discovered afterwards.
+
+**New: "one market id" is too narrow.** Jupiter has no market-id field; a
+market is the tuple (pool, custody, collateralCustody), and long and short use
+*different* collateral custody accounts. The fixed-width-bytes rule survives
+(they are Pubkeys), but a single `market: [u8;16]` argument does not — an
+adapter must map a local id to that tuple.
+
+**Unestablished, and a hard pre-flight for Gate C.** Jupiter's IDL contains
+error `CPINotAllowed`. Whether it guards the owner-signed request
+instructions could not be determined — the program is closed-source and the
+keeper code is not published. If it does, there is no on-chain adapter path at
+all. **Do not design a Jupiter adapter before probing this by simulation on a
+live cluster.**
+
+### What changes because of this
+
+Nothing in Gate B. `demo_perps` is synchronous and reports its fill, and the
+mandate program now refuses rather than inventing one. For Gate C, the venue
+checklist in ADR-003/`docs/FACTS.md` gains three questions that the existing
+five do not ask:
+
+6. Does a write report its fill to a CPI caller, or only to an off-chain log?
+7. Between request and fulfilment, who can move or return the collateral?
+8. Is CPI into the write path permitted at all?
+
+Also noted: the Drift documentation now redirects to Velocity
+(`docs.drift.trade` → `docs.velocity.exchange`), so the copy ban in `docs/08`
+§8 needs `velocity` alongside `drift` — it already has both.

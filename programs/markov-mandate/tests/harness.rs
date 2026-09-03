@@ -22,6 +22,7 @@ pub const FEED_ID: [u8; 32] = [0xef; 32];
 /// A Wednesday, so the UTC-day rollover tests are readable.
 pub const NOW: i64 = 1_788_400_000;
 pub const MARK_PRICE_E6: u64 = 100_000_000;
+pub const MARKET_ID: [u8; 16] = *b"SOL-PERP\0\0\0\0\0\0\0\0";
 
 pub struct Env {
     pub svm: LiteSVM,
@@ -39,6 +40,11 @@ pub struct Env {
     pub owner_ata: Pubkey,
     pub price_update: Pubkey,
     pub event_authority: Pubkey,
+    /// demo_perps accounts: the venue is a real program in these tests, not a
+    /// stub, so gates 13 and 14 are exercised for real.
+    pub venue_market: Pubkey,
+    pub venue_mark: Pubkey,
+    pub venue_position: Pubkey,
 }
 
 /// SPL Mint, packed by hand (82 bytes). Hand-rolled on purpose: the published
@@ -211,6 +217,12 @@ impl Env {
         let (vault, _) =
             Pubkey::find_program_address(&[Mandate::VAULT_SEED, mandate.as_ref()], &program);
 
+        let market_id = MARKET_ID;
+        let (venue_market, _) = Pubkey::find_program_address(&[b"market", market_id.as_ref()], &venue);
+        let (venue_mark, _) = Pubkey::find_program_address(&[b"mark", market_id.as_ref()], &venue);
+        let (venue_position, _) =
+            Pubkey::find_program_address(&[b"pos", mandate.as_ref(), market_id.as_ref()], &venue);
+
         let mut env = Env {
             svm,
             program,
@@ -227,11 +239,17 @@ impl Env {
             owner_ata,
             price_update,
             event_authority,
+            venue_market,
+            venue_mark,
+            venue_position,
         };
 
         env.init_registry();
         env.set_adapters(vec![venue]);
         env.create_mandate(policy(venue, mint, NOW + 86_400));
+        env.venue_init_market();
+        env.venue_post_mark(MARK_PRICE_E6 as i64);
+        env.venue_init_position();
         if vault_amount > 0 {
             env.fund(vault_amount).expect("fund");
         }
@@ -473,6 +491,86 @@ impl Env {
         self.send(ix, &[signer])
     }
 
+    // ── demo_perps setup, through the venue's own instructions ────────────
+
+    pub fn venue_ix(&self, data: Vec<u8>, metas: Vec<solana_instruction::AccountMeta>) -> Instruction {
+        Instruction { program_id: self.venue, accounts: metas, data }
+    }
+
+    pub fn venue_init_market(&mut self) {
+        let payer = self.payer.insecure_clone();
+        let ix = self.venue_ix(
+            demo_perps::instruction::InitMarket {
+                args: demo_perps::InitMarketArgs {
+                    market_id: MARKET_ID,
+                    base_decimals: 9,
+                    fee_bps: 10,
+                    max_age_slots: 300,
+                    position_cap: 1_000_000_000,
+                    poster: payer.pubkey(),
+                },
+            }
+            .data(),
+            vec![
+                solana_instruction::AccountMeta::new(payer.pubkey(), true),
+                solana_instruction::AccountMeta::new(self.venue_market, false),
+                solana_instruction::AccountMeta::new(self.venue_mark, false),
+                solana_instruction::AccountMeta::new_readonly(
+                    anchor_lang::solana_program::system_program::ID,
+                    false,
+                ),
+            ],
+        );
+        self.send(ix, &[&payer]).expect("venue init_market");
+    }
+
+    pub fn venue_post_mark(&mut self, price_e6: i64) {
+        let payer = self.payer.insecure_clone();
+        let ix = self.venue_ix(
+            demo_perps::instruction::PostMark { price: price_e6, expo: -6, publish_time: NOW - 5 }.data(),
+            vec![
+                solana_instruction::AccountMeta::new_readonly(payer.pubkey(), true),
+                solana_instruction::AccountMeta::new_readonly(self.venue_market, false),
+                solana_instruction::AccountMeta::new(self.venue_mark, false),
+            ],
+        );
+        self.send(ix, &[&payer]).expect("venue post_mark");
+    }
+
+    pub fn venue_pause(&mut self, paused: bool) {
+        let payer = self.payer.insecure_clone();
+        let ix = self.venue_ix(
+            demo_perps::instruction::SetMarketPaused { paused }.data(),
+            vec![
+                solana_instruction::AccountMeta::new_readonly(payer.pubkey(), true),
+                solana_instruction::AccountMeta::new(self.venue_market, false),
+            ],
+        );
+        self.send(ix, &[&payer]).expect("venue set_market_paused");
+    }
+
+    pub fn venue_init_position(&mut self) {
+        let payer = self.payer.insecure_clone();
+        let ix = self.venue_ix(
+            demo_perps::instruction::InitPosition { mandate: self.mandate, market_id: MARKET_ID }.data(),
+            vec![
+                solana_instruction::AccountMeta::new(payer.pubkey(), true),
+                solana_instruction::AccountMeta::new_readonly(self.venue_market, false),
+                solana_instruction::AccountMeta::new(self.venue_position, false),
+                solana_instruction::AccountMeta::new_readonly(
+                    anchor_lang::solana_program::system_program::ID,
+                    false,
+                ),
+            ],
+        );
+        self.send(ix, &[&payer]).expect("venue init_position");
+    }
+
+    pub fn venue_position_state(&self) -> demo_perps::Position {
+        let acc = self.svm.get_account(&self.venue_position).unwrap();
+        demo_perps::Position::try_deserialize(&mut &acc.data[..]).unwrap()
+    }
+
     pub fn mandate_state(&self) -> Mandate {
         let acc = self.svm.get_account(&self.mandate).unwrap();
         Mandate::try_deserialize(&mut &acc.data[..]).unwrap()
@@ -499,7 +597,7 @@ pub fn intent(
     markov_mandate::gates::Intent {
         intent_id: [id; 32],
         action,
-        market: *b"SOL-PERP\0\0\0\0\0\0\0\0",
+        market: MARKET_ID,
         notional,
         side: markov_types::Side::Long,
         limit_price: MARK_PRICE_E6,

@@ -1659,6 +1659,8 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "litesvm",
+ "markov-types",
+ "pyth-solana-receiver-sdk",
  "solana-keypair",
  "solana-message",
  "solana-signer",
