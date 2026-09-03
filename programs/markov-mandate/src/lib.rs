@@ -345,8 +345,7 @@ pub mod markov_mandate {
             &ctx.accounts.mandate.feed_id,
             ctx.accounts.mandate.policy.max_mark_age_secs,
             &clock,
-        )
-        .ok();
+        );
         let mark_input = bound.as_ref().map(|b| MarkInput {
             price_e6: b.price_e6(),
         });
@@ -417,61 +416,51 @@ pub mod markov_mandate {
         infos.push(ctx.accounts.mandate.to_account_info());
         infos.push(ctx.accounts.venue_program.to_account_info());
 
-        // Gate 13: the venue said no. That is a refusal, not a crash.
-        if cpi::venue::venue_execute(
+        // A venue that *errors* takes the whole transaction down with it — the
+        // runtime fails the transaction even though `invoke_signed` hands the
+        // error back — so nothing could be committed afterwards. The adapter
+        // ABI therefore requires venue conditions to come back as data
+        // (ADR-008); an `Err` here is a structural fault, and it reverts.
+        cpi::venue::venue_execute(
             &ctx.accounts.venue_program.to_account_info(),
             &infos,
             metas,
             &args,
             &[seeds],
-        )
-        .is_err()
-        {
-            ctx.accounts.mandate.action_seq = seq;
-            emit_cpi!(RefusalReceipt {
-                seq,
-                intent_id: intent.intent_id,
-                mandate: ctx.accounts.mandate.key(),
-                operator: signer,
-                strategy_id: ctx.accounts.mandate.strategy_id,
-                venue,
-                action: intent.action as u8,
-                notional: intent.notional,
-                reason: BlockReason::VenueRejected,
-                gate_index: 13,
-                forced: intent.forced,
-                ts: now,
-                slot: clock.slot,
-            });
-            return Ok(());
-        }
+        )?;
 
-        // The venue must say what it filled. A CPI returns no value, so this
-        // reads the fill it reported; if there is none, the program refuses
-        // rather than writing the limit price into a receipt and calling it a
-        // fill (ADR-007). Gate 13 covers this: the venue did not deliver a
-        // result we can describe.
-        let Some(fill) = cpi::venue::reported_fill(&venue) else {
-            ctx.accounts.mandate.action_seq = seq;
-            emit_cpi!(RefusalReceipt {
-                seq,
-                intent_id: intent.intent_id,
-                mandate: ctx.accounts.mandate.key(),
-                operator: signer,
-                strategy_id: ctx.accounts.mandate.strategy_id,
-                venue,
-                action: intent.action as u8,
-                notional: intent.notional,
-                reason: BlockReason::VenueRejected,
-                gate_index: 13,
-                forced: intent.forced,
-                ts: now,
-                slot: clock.slot,
-            });
-            return Ok(());
+        // Gate 13: what did the venue say? A refusal reported as data commits
+        // a receipt, which is the whole point of ADR-008. A fill is used as
+        // reported. Silence is refused rather than filled in with the limit
+        // price (ADR-007).
+        let report = cpi::venue::reported(&venue);
+        let fill = match report {
+            Some(markov_types::VenueReport::Filled(f)) => f,
+            _ => {
+                ctx.accounts.mandate.action_seq = seq;
+                emit_cpi!(RefusalReceipt {
+                    seq,
+                    intent_id: intent.intent_id,
+                    mandate: ctx.accounts.mandate.key(),
+                    operator: signer,
+                    strategy_id: ctx.accounts.mandate.strategy_id,
+                    venue,
+                    action: intent.action as u8,
+                    notional: intent.notional,
+                    reason: BlockReason::VenueRejected,
+                    gate_index: 13,
+                    forced: intent.forced,
+                    ts: now,
+                    slot: clock.slot,
+                });
+                return Ok(());
+            }
         };
         // A venue may fill less than asked, never more.
-        require!(fill.notional <= intent.notional, MandateError::PostCheckFailed);
+        require!(
+            fill.notional <= intent.notional,
+            MandateError::PostCheckFailed
+        );
 
         // Gate 14: the only refusal allowed to be an `Err`. A state we cannot
         // describe is a state we do not keep.

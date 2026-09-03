@@ -489,3 +489,114 @@ fn close_mandate_needs_an_empty_vault_and_returns_rent() {
         .get_account(&e.mandate)
         .is_none_or(|a| a.data.is_empty()));
 }
+
+// ─────────────── P04: the venue is real now, so gates 13 and 14 fire ───────
+
+/// The receipt must carry the price the venue actually filled at. Before P04
+/// this field was `intent.limit_price` — a fabricated fill on a signed
+/// receipt, which is exactly what ADR-007 exists to prevent.
+#[test]
+fn the_action_receipt_carries_the_venues_real_fill_not_the_limit() {
+    let mut e = Env::new(1_000);
+    let operator = e.operator.insecure_clone();
+    let mut it = intent(ActionKind::Open, 10, 50);
+    // Ask with a limit above the mark, so limit and fill cannot coincide.
+    // +30 bps: inside the policy's 50 bps bound, and deliberately not equal
+    // to the fill (mark + the venue's 10 bps fee), so the two cannot coincide
+    // and pass this test by accident.
+    it.limit_price = MARK_PRICE_E6 + MARK_PRICE_E6 * 30 / 10_000;
+    let meta = e.execute(it, &operator).expect("execute");
+    let a = actions(&meta);
+    assert_eq!(a.len(), 1, "no ActionReceipt: {:?}", meta.logs);
+    let r = &a[0];
+
+    // demo_perps' market charges 10 bps and a taker never gets a better
+    // price than the mark, so a long open fills at mark + 10 bps.
+    let expected = MARK_PRICE_E6 + MARK_PRICE_E6 * 10 / 10_000;
+    assert_eq!(r.fill_price, expected, "fill is not mark + fee");
+    assert_ne!(
+        r.fill_price, it.limit_price,
+        "fill_price is the limit price again"
+    );
+    assert_eq!(r.mark_price, MARK_PRICE_E6);
+    assert_eq!(r.fee, 10 * 10 / 10_000, "fee is not the venue's");
+    assert_eq!(r.notional, 10);
+
+    // …and the venue really moved: the position exists at that price.
+    let p = e.venue_position_state();
+    assert_eq!(p.notional, 10);
+    assert_eq!(p.entry_price, expected);
+}
+
+/// Gate 13: when the venue refuses, the mandate records a refusal and commits
+/// — it does not fail the transaction and it does not invent a fill.
+#[test]
+fn a_venue_refusal_is_a_committed_receipt_at_gate_13() {
+    for (label, drive) in [
+        (
+            "stale venue mark",
+            (|e: &mut Env| {
+                // The venue's own mark, not the Pyth account the mandate reads:
+                // demo_perps refuses on its own freshness rule (max_age 300
+                // slots). The Pyth mark stays fresh, so this isolates gate 13
+                // from gate 12: the mandate's own freshness gate passes and the
+                // venue is the one that refuses.
+                e.venue_replay_old_mark(1);
+                set_clock_slot(&mut e.svm, 100_000);
+            }) as fn(&mut Env),
+        ),
+        ("paused venue", |e: &mut Env| e.venue_pause(true)),
+    ] {
+        let mut e = Env::new(1_000);
+        drive(&mut e);
+        let operator = e.operator.insecure_clone();
+        let meta = e
+            .execute(intent(ActionKind::Open, 10, 60), &operator)
+            .unwrap_or_else(|err| panic!("{label}: a venue refusal must commit, got {err:?}"));
+        let rs = refusals(&meta);
+        assert_eq!(
+            rs.len(),
+            1,
+            "{label}: expected one receipt, logs {:?}",
+            meta.logs
+        );
+        assert_eq!(rs[0].reason, BlockReason::VenueRejected, "{label}");
+        assert_eq!(rs[0].gate_index, 13, "{label}");
+        assert!(
+            actions(&meta).is_empty(),
+            "{label}: a refusal emitted an ActionReceipt"
+        );
+        assert_eq!(
+            e.venue_position_state().notional,
+            0,
+            "{label}: the position moved anyway"
+        );
+        assert_eq!(
+            e.mandate_state().day_notional_used,
+            0,
+            "{label}: the cap was spent"
+        );
+    }
+}
+
+/// A fill can be smaller than the intent but never larger, and the daily
+/// counter spends what was filled.
+#[test]
+fn the_counter_spends_the_filled_notional() {
+    let mut e = Env::new(1_000);
+    let operator = e.operator.insecure_clone();
+    let meta = e
+        .execute(intent(ActionKind::Open, 40, 70), &operator)
+        .expect("open");
+    assert_eq!(actions(&meta)[0].notional, 40);
+    assert_eq!(e.mandate_state().day_notional_used, 40);
+
+    // Closing reports the whole held size, which is what the venue filled.
+    let mut close = intent(ActionKind::Close, 40, 71);
+    close.action = ActionKind::Close;
+    let meta = e.execute(close, &operator).expect("close");
+    let a = actions(&meta);
+    assert_eq!(a.len(), 1, "{:?}", meta.logs);
+    assert_eq!(a[0].notional, 40, "close did not report the held size");
+    assert_eq!(e.venue_position_state().notional, 0);
+}

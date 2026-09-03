@@ -24,13 +24,19 @@ pub trait Fixture: VenueAdapter + Sized {
     /// A market this adapter does not know.
     fn unknown_market() -> MarketId;
     /// Make the mark too old for the venue to accept.
-    fn make_mark_stale(&mut self);
+    fn make_mark_stale(&mut self) -> bool;
     /// Halt the venue.
-    fn pause(&mut self);
+    fn pause(&mut self) -> bool;
     /// Shrink available collateral below `notional`.
-    fn starve_collateral(&mut self);
+    ///
+    /// Returning `false` means this adapter *cannot* create the condition —
+    /// `demo_perps` holds no token custody, so it has no collateral to
+    /// starve, and `InsufficientCollateral` is genuinely unreachable there.
+    /// The suite records that as not-applicable rather than passing or
+    /// failing it, because a real venue with custody will produce it.
+    fn starve_collateral(&mut self) -> bool;
     /// Lower the venue's own position cap below `notional`.
-    fn cap_positions_below(&mut self, notional: u64);
+    fn cap_positions_below(&mut self, notional: u64) -> bool;
 }
 
 /// One named check and its result, so a caller can print a table rather than
@@ -39,6 +45,9 @@ pub trait Fixture: VenueAdapter + Sized {
 pub struct Check {
     pub name: &'static str,
     pub passed: bool,
+    /// True when the adapter cannot create the precondition. Counted
+    /// separately so a suite full of skips cannot look like a pass.
+    pub skipped: bool,
     pub detail: String,
 }
 
@@ -46,7 +55,20 @@ fn check(name: &'static str, passed: bool, detail: impl Into<String>) -> Check {
     Check {
         name,
         passed,
+        skipped: false,
         detail: detail.into(),
+    }
+}
+
+/// Record a check whose precondition this adapter cannot create. Neither a
+/// pass nor a failure: `assert_conforms` counts these separately, so a run
+/// that skipped most of the suite cannot read as a clean one.
+fn skip(name: &'static str, why: impl Into<String>) -> Check {
+    Check {
+        name,
+        passed: true,
+        skipped: true,
+        detail: format!("not applicable: {}", why.into()),
     }
 }
 
@@ -95,13 +117,19 @@ pub fn run<A: Fixture>() -> Vec<Check> {
     // 2. A stale mark is refused, by the venue, on its own account.
     {
         let mut a = A::new_fixture(mandate, market, PRICE_E6);
-        a.make_mark_stale();
-        let res = a.open(req(mandate, market));
-        out.push(check(
-            "stale_mark_returns_stale_mark",
-            res == Err(VenueError::StaleMark),
-            format!("{res:?}"),
-        ));
+        if a.make_mark_stale() {
+            let res = a.open(req(mandate, market));
+            out.push(check(
+                "stale_mark_returns_stale_mark",
+                res == Err(VenueError::StaleMark),
+                format!("{res:?}"),
+            ));
+        } else {
+            out.push(skip(
+                "stale_mark_returns_stale_mark",
+                "the adapter cannot age its mark",
+            ));
+        }
     }
 
     // 3. A fill lands inside the slippage bound the intent asked for.
@@ -160,37 +188,58 @@ pub fn run<A: Fixture>() -> Vec<Check> {
         ));
     }
 
-    // 6. The remaining three errors in the fixed set are reachable. An error
-    //    variant no adapter can produce is decoration.
+    // 6. The remaining three errors in the fixed set are reachable — unless
+    //    the adapter genuinely cannot create the condition, which it says by
+    //    returning false. An error variant *no* adapter can produce would be
+    //    decoration; one a zero-custody mock cannot produce is a fact about
+    //    the mock.
     {
         let mut a = A::new_fixture(mandate, market, PRICE_E6);
-        a.pause();
-        let res = a.open(req(mandate, market));
-        out.push(check(
-            "paused_venue_returns_venue_paused",
-            res == Err(VenueError::VenuePaused),
-            format!("{res:?}"),
-        ));
+        if a.pause() {
+            let res = a.open(req(mandate, market));
+            out.push(check(
+                "paused_venue_returns_venue_paused",
+                res == Err(VenueError::VenuePaused),
+                format!("{res:?}"),
+            ));
+        } else {
+            out.push(skip(
+                "paused_venue_returns_venue_paused",
+                "the adapter cannot be paused",
+            ));
+        }
     }
     {
         let mut a = A::new_fixture(mandate, market, PRICE_E6);
-        a.starve_collateral();
-        let res = a.open(req(mandate, market));
-        out.push(check(
-            "insufficient_collateral_is_named",
-            res == Err(VenueError::InsufficientCollateral),
-            format!("{res:?}"),
-        ));
+        if a.starve_collateral() {
+            let res = a.open(req(mandate, market));
+            out.push(check(
+                "insufficient_collateral_is_named",
+                res == Err(VenueError::InsufficientCollateral),
+                format!("{res:?}"),
+            ));
+        } else {
+            out.push(skip(
+                "insufficient_collateral_is_named",
+                "the adapter holds no collateral to starve",
+            ));
+        }
     }
     {
         let mut a = A::new_fixture(mandate, market, PRICE_E6);
-        a.cap_positions_below(NOTIONAL);
-        let res = a.open(req(mandate, market));
-        out.push(check(
-            "position_limit_is_named",
-            res == Err(VenueError::PositionLimit),
-            format!("{res:?}"),
-        ));
+        if a.cap_positions_below(NOTIONAL) {
+            let res = a.open(req(mandate, market));
+            out.push(check(
+                "position_limit_is_named",
+                res == Err(VenueError::PositionLimit),
+                format!("{res:?}"),
+            ));
+        } else {
+            out.push(skip(
+                "position_limit_is_named",
+                "the adapter has no position cap",
+            ));
+        }
     }
 
     // 7. A limit the venue cannot honour is refused rather than filled wide.

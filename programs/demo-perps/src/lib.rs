@@ -23,7 +23,7 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::set_return_data;
-use markov_types::{ActionKind, MarkSourceKind, Side, VenueFill};
+use markov_types::{ActionKind, MarkSourceKind, Side, VenueFill, VenueReport};
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 declare_id!("3Zcd8XsFWBTVku5GxQjwEBC7sLrJhF8vadyTnTr56hxB");
@@ -80,6 +80,27 @@ pub mod demo_perps {
         Ok(())
     }
 
+    /// Re-parameterise a market. Authority only, and it can only ever change
+    /// numbers — there is no token here to move, and it cannot rewrite a
+    /// position or a mark.
+    pub fn set_market_params(
+        ctx: Context<MarketAuthority>,
+        fee_bps: u16,
+        max_age_slots: u64,
+        position_cap: u64,
+    ) -> Result<()> {
+        require!(fee_bps <= 1_000, DemoPerpsError::InvalidParameter);
+        require!(
+            max_age_slots > 0 && max_age_slots <= MARK_MAX_AGE_SLOTS_CEILING,
+            DemoPerpsError::InvalidParameter
+        );
+        let m = &mut ctx.accounts.market;
+        m.fee_bps = fee_bps;
+        m.max_age_slots = max_age_slots;
+        m.position_cap = position_cap;
+        Ok(())
+    }
+
     /// Relay a Pyth price onto the market's mark account. Anyone may call it —
     /// there is nothing to gain, because the price is read from the Pyth
     /// account itself and verified (owner, feed id, `Full`, freshness) rather
@@ -111,7 +132,12 @@ pub mod demo_perps {
     /// and it may write **nothing but** price, expo, publish time and slot —
     /// it cannot pause a market, cannot open a position and holds no tokens.
     /// `source` records `house`, which the page must display as a house mark.
-    pub fn post_mark(ctx: Context<PostMark>, price: i64, expo: i32, publish_time: i64) -> Result<()> {
+    pub fn post_mark(
+        ctx: Context<PostMark>,
+        price: i64,
+        expo: i32,
+        publish_time: i64,
+    ) -> Result<()> {
         require!(price > 0, DemoPerpsError::InvalidParameter);
         let clock = Clock::get()?;
         let k = &mut ctx.accounts.mark;
@@ -133,8 +159,15 @@ pub mod demo_perps {
     /// Create the position record for one mandate and market. Separate from
     /// `venue_execute` so the write path needs no payer and no system program:
     /// the mandate PDA signs the trade, it does not fund accounts.
-    pub fn init_position(ctx: Context<InitPosition>, mandate: Pubkey, market_id: [u8; 16]) -> Result<()> {
-        require!(ctx.accounts.market.market_id == market_id, DemoPerpsError::MarketUnknown);
+    pub fn init_position(
+        ctx: Context<InitPosition>,
+        mandate: Pubkey,
+        market_id: [u8; 16],
+    ) -> Result<()> {
+        require!(
+            ctx.accounts.market.market_id == market_id,
+            DemoPerpsError::MarketUnknown
+        );
         let p = &mut ctx.accounts.position;
         p.mandate = mandate;
         p.market_id = market_id;
@@ -159,25 +192,41 @@ pub mod demo_perps {
         let mark = &ctx.accounts.mark;
         let clock = Clock::get()?;
 
-        require!(!market.paused, DemoPerpsError::VenuePaused);
-        require!(market.market_id == args.market, DemoPerpsError::MarketUnknown);
-        require!(ctx.accounts.position.market_id == args.market, DemoPerpsError::MarketUnknown);
+        // Structural faults are bugs and revert; venue *conditions* are
+        // reported as data so the mandate program can commit a receipt for
+        // them (ADR-008).
+        require!(
+            ctx.accounts.position.market_id == args.market,
+            DemoPerpsError::MarketUnknown
+        );
         require_keys_eq!(
             ctx.accounts.position.mandate,
             ctx.accounts.mandate.key(),
             DemoPerpsError::WrongMandate
         );
 
+        if market.paused {
+            return refuse(DemoPerpsError::VenuePaused);
+        }
+        if market.market_id != args.market {
+            return refuse(DemoPerpsError::MarketUnknown);
+        }
         // Freshness, on the venue's own account. The mandate program checks
         // this too; two independent checks is deliberate.
-        require!(mark.slot > 0, DemoPerpsError::StaleMark);
         let age = clock.slot.saturating_sub(mark.slot);
-        require!(age <= market.max_age_slots, DemoPerpsError::StaleMark);
-        require!(mark.price > 0, DemoPerpsError::StaleMark);
+        if mark.slot == 0 || age > market.max_age_slots || mark.price <= 0 {
+            return refuse(DemoPerpsError::StaleMark);
+        }
 
         let action = ActionKind::from_u8(args.action).ok_or(DemoPerpsError::UnknownAction)?;
-        let side = if args.side == Side::Short as u8 { Side::Short } else { Side::Long };
-        let mark_e6 = mark_price_e6(mark.price, mark.expo).ok_or(DemoPerpsError::StaleMark)?;
+        let side = if args.side == Side::Short as u8 {
+            Side::Short
+        } else {
+            Side::Long
+        };
+        let Some(mark_e6) = mark_price_e6(mark.price, mark.expo) else {
+            return refuse(DemoPerpsError::StaleMark);
+        };
 
         // Funding first, so a position always pays for the time it was held
         // before its size changes.
@@ -186,30 +235,43 @@ pub mod demo_perps {
         let fee_bps = market.fee_bps as u64;
         let (fill_price, notional) = match action {
             ActionKind::Open | ActionKind::Increase => {
-                require!(args.notional > 0, DemoPerpsError::InvalidNotional);
+                if args.notional == 0 {
+                    return refuse(DemoPerpsError::InvalidNotional);
+                }
                 let new_total = ctx
                     .accounts
                     .position
                     .notional
                     .checked_add(args.notional)
                     .ok_or(DemoPerpsError::Math)?;
-                require!(new_total <= market.position_cap, DemoPerpsError::PositionLimit);
+                if new_total > market.position_cap {
+                    return refuse(DemoPerpsError::PositionLimit);
+                }
                 // The taker pays the fee: worse than the mark, never better.
-                let p = worse_for_taker(mark_e6, fee_bps, side, true).ok_or(DemoPerpsError::Math)?;
+                let p =
+                    worse_for_taker(mark_e6, fee_bps, side, true).ok_or(DemoPerpsError::Math)?;
                 (p, args.notional)
             }
             ActionKind::Reduce => {
-                require!(args.notional > 0, DemoPerpsError::InvalidNotional);
+                if args.notional == 0 {
+                    return refuse(DemoPerpsError::InvalidNotional);
+                }
                 let held = ctx.accounts.position.notional;
-                require!(held > 0, DemoPerpsError::NoPosition);
+                if held == 0 {
+                    return refuse(DemoPerpsError::NoPosition);
+                }
                 let n = args.notional.min(held);
-                let p = worse_for_taker(mark_e6, fee_bps, side, false).ok_or(DemoPerpsError::Math)?;
+                let p =
+                    worse_for_taker(mark_e6, fee_bps, side, false).ok_or(DemoPerpsError::Math)?;
                 (p, n)
             }
             ActionKind::Close | ActionKind::Flatten => {
                 let held = ctx.accounts.position.notional;
-                require!(held > 0, DemoPerpsError::NoPosition);
-                let p = worse_for_taker(mark_e6, fee_bps, side, false).ok_or(DemoPerpsError::Math)?;
+                if held == 0 {
+                    return refuse(DemoPerpsError::NoPosition);
+                }
+                let p =
+                    worse_for_taker(mark_e6, fee_bps, side, false).ok_or(DemoPerpsError::Math)?;
                 (p, held)
             }
             ActionKind::Skip => return err!(DemoPerpsError::UnknownAction),
@@ -218,7 +280,7 @@ pub mod demo_perps {
         // The venue enforces the caller's bound as well. A fill outside it is
         // refused, never widened.
         if !within_bound(fill_price, args.limit_price, args.max_slippage_bps) {
-            return err!(DemoPerpsError::SlippageExceeded);
+            return refuse(DemoPerpsError::SlippageExceeded);
         }
 
         let p = &mut ctx.accounts.position;
@@ -229,11 +291,15 @@ pub mod demo_perps {
                 let old_entry = p.entry_price as u128;
                 let add = notional as u128;
                 let total = old_notional + add;
-                p.entry_price = if total == 0 {
-                    fill_price
-                } else {
-                    u64::try_from((old_notional * old_entry + add * fill_price as u128) / total)
-                        .map_err(|_| error!(DemoPerpsError::Math))?
+                p.entry_price = match (old_notional * old_entry + add * fill_price as u128)
+                    .checked_div(total)
+                {
+                    Some(weighted) => {
+                        u64::try_from(weighted).map_err(|_| error!(DemoPerpsError::Math))?
+                    }
+                    // total == 0 only when nothing is held and nothing is
+                    // added, which the notional check above already refuses.
+                    None => fill_price,
                 };
                 p.notional = u64::try_from(total).map_err(|_| error!(DemoPerpsError::Math))?;
                 p.side = side;
@@ -253,12 +319,14 @@ pub mod demo_perps {
             .checked_div(10_000)
             .and_then(|f| u64::try_from(f).ok())
             .ok_or(DemoPerpsError::Math)?;
-        let fill = VenueFill { price: fill_price, notional, fee };
+        let fill = VenueFill {
+            price: fill_price,
+            notional,
+            fee,
+        };
 
         // The only way the caller learns the real fill.
-        let mut bytes = Vec::with_capacity(24);
-        fill.serialize(&mut bytes).map_err(|_| error!(DemoPerpsError::Math))?;
-        set_return_data(&bytes);
+        report(VenueReport::Filled(fill))?;
 
         emit!(VenueFilled {
             mandate: ctx.accounts.mandate.key(),
@@ -276,6 +344,26 @@ pub mod demo_perps {
         });
         Ok(())
     }
+}
+
+/// Report an outcome to the caller through return data. This is the whole
+/// channel: a CPI returns no value, and an `Err` would fail the caller's
+/// transaction so no receipt could be committed (ADR-008).
+fn report(r: VenueReport) -> Result<()> {
+    let mut bytes = Vec::with_capacity(32);
+    r.serialize(&mut bytes)
+        .map_err(|_| error!(DemoPerpsError::Math))?;
+    set_return_data(&bytes);
+    Ok(())
+}
+
+/// Decline, as data. The caller commits a `RefusalReceipt` at gate 13; the
+/// venue's own code travels along for the detail.
+fn refuse(e: DemoPerpsError) -> Result<()> {
+    msg!("demo_perps: refused ({:?})", e);
+    report(VenueReport::Refused {
+        code: e as u32 + anchor_lang::error::ERROR_CODE_OFFSET,
+    })
 }
 
 /// A mark's price scaled to 1e6 per unit. Returns `None` rather than a wrong
@@ -297,7 +385,9 @@ fn mark_price_e6(price: i64, expo: i32) -> Option<u64> {
 /// The taker's price: always the side of the mark that costs them the fee.
 /// Opening a long or closing a short pays up; the reverse receives less.
 fn worse_for_taker(mark_e6: u64, fee_bps: u64, side: Side, entering: bool) -> Option<u64> {
-    let fee = (mark_e6 as u128).checked_mul(fee_bps as u128)?.checked_div(10_000)?;
+    let fee = (mark_e6 as u128)
+        .checked_mul(fee_bps as u128)?
+        .checked_div(10_000)?;
     let pay_up = matches!((side, entering), (Side::Long, true) | (Side::Short, false));
     let out = if pay_up {
         (mark_e6 as u128).checked_add(fee)?
@@ -332,7 +422,9 @@ fn accrue_funding(p: &mut Account<'_, Position>, now_slot: u64) {
         Side::Long => -magnitude,
         Side::Short => magnitude,
     };
-    p.funding_accrued = p.funding_accrued.saturating_add(i64::try_from(signed).unwrap_or(0));
+    p.funding_accrued = p
+        .funding_accrued
+        .saturating_add(i64::try_from(signed).unwrap_or(0));
 }
 
 trait FromU8: Sized {

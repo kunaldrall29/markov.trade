@@ -27,18 +27,22 @@ pub struct VenueExecuteArgs {
     pub max_slippage_bps: u16,
 }
 
-/// Read the fill the venue reported with `set_return_data`.
+/// Read what the venue reported with `set_return_data`.
 ///
 /// A Solana CPI returns no value, so this is the only way the program learns
-/// what actually traded. `None` means the venue reported nothing — and the
-/// caller must then refuse, because the alternative is writing the limit
+/// what actually traded — and, because a failed CPI fails the whole
+/// transaction, it is also the only way a venue *refusal* can reach a
+/// committed receipt (ADR-008).
+///
+/// `None` means the venue reported nothing, or reported it from the wrong
+/// program. The caller must then refuse: the alternative is writing the limit
 /// price into a receipt and calling it a fill (ADR-007).
-pub fn reported_fill(expected_program: &Pubkey) -> Option<markov_types::VenueFill> {
+pub fn reported(expected_program: &Pubkey) -> Option<markov_types::VenueReport> {
     let (program, data) = anchor_lang::solana_program::program::get_return_data()?;
     if program != *expected_program {
         return None;
     }
-    markov_types::VenueFill::try_from_slice(&data).ok()
+    markov_types::VenueReport::try_from_slice(&data).ok()
 }
 
 /// Anchor's global instruction discriminator.
@@ -50,24 +54,28 @@ fn sighash(name: &str) -> [u8; 8] {
     out
 }
 
-/// Call the venue. Returns `Err(())` when the venue rejects, which the caller
-/// turns into a `VenueRejected` receipt (gate 13) — never a panic, never a
-/// silent success.
+/// Call the venue.
+///
+/// An `Err` from here is a **structural fault**, not a venue refusal: since
+/// ADR-008 the ABI requires venue conditions to come back as return data,
+/// because a failed CPI fails the whole transaction and no receipt could
+/// commit. The real program error is propagated so the failure is legible in
+/// the logs rather than flattened to a unit.
 pub fn venue_execute<'info>(
     venue_program: &AccountInfo<'info>,
     accounts: &[AccountInfo<'info>],
     metas: Vec<AccountMeta>,
     args: &VenueExecuteArgs,
     signer_seeds: &[&[&[u8]]],
-) -> core::result::Result<(), ()> {
+) -> Result<()> {
     let mut data = sighash("venue_execute").to_vec();
-    args.serialize(&mut data).map_err(|_| ())?;
+    args.serialize(&mut data)?;
     let ix = Instruction {
         program_id: venue_program.key(),
         accounts: metas,
         data,
     };
-    invoke_signed(&ix, accounts, signer_seeds).map_err(|_| ())
+    invoke_signed(&ix, accounts, signer_seeds).map_err(Into::into)
 }
 
 /// What the program insists is still true after the venue returns. This is a

@@ -173,7 +173,11 @@ impl ActionKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(
     feature = "anchor",
-    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, anchor_lang::InitSpace)
+    derive(
+        anchor_lang::AnchorSerialize,
+        anchor_lang::AnchorDeserialize,
+        anchor_lang::InitSpace
+    )
 )]
 pub struct VenueFill {
     /// Scaled 1e6 per unit.
@@ -183,12 +187,44 @@ pub struct VenueFill {
     pub fee: u64,
 }
 
+/// What a venue reports back through `set_return_data`.
+///
+/// **A venue must not use a program error to signal a refusal.** On this
+/// runtime a failed CPI fails the whole transaction — the caller genuinely
+/// receives the error from `invoke_signed`, but the runtime has already
+/// doomed the transaction, so nothing the caller emits afterwards is
+/// committed. A venue refusal signalled as an `Err` therefore produces **no
+/// receipt at all**, which contradicts the one rule this project cannot bend:
+/// every allow and every block that reaches the program emits a receipt.
+///
+/// So an adapter reports its refusal as *data* and returns `Ok`. Program
+/// errors are reserved for structural faults — a wrong account, an unknown
+/// instruction — which are bugs rather than venue conditions and should
+/// revert. See ADR-008.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "anchor",
+    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize)
+)]
+pub enum VenueReport {
+    /// The venue traded. The price is what it actually filled at.
+    Filled(VenueFill),
+    /// The venue declined, with its own error code for the detail. The
+    /// mandate program does not re-interpret it: every venue refusal reaches
+    /// the chain as `BlockReason::VenueRejected` at gate 13.
+    Refused { code: u32 },
+}
+
 /// Where a mark came from. On chain, so the page can say it rather than guess.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(
     feature = "anchor",
-    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, anchor_lang::InitSpace),
+    derive(
+        anchor_lang::AnchorSerialize,
+        anchor_lang::AnchorDeserialize,
+        anchor_lang::InitSpace
+    ),
     borsh(use_discriminant = true)
 )]
 pub enum MarkSourceKind {

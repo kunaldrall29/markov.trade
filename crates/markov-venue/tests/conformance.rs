@@ -189,17 +189,21 @@ impl Fixture for DemoPerpsClient {
     fn unknown_market() -> MarketId {
         market_id("NOPE-PERP").expect("fits")
     }
-    fn make_mark_stale(&mut self) {
+    fn make_mark_stale(&mut self) -> bool {
         self.c.mark_age_secs = Self::MAX_MARK_AGE + 1;
+        true
     }
-    fn pause(&mut self) {
+    fn pause(&mut self) -> bool {
         self.c.paused = true;
+        true
     }
-    fn starve_collateral(&mut self) {
+    fn starve_collateral(&mut self) -> bool {
         self.c.collateral = 1;
+        true
     }
-    fn cap_positions_below(&mut self, notional: u64) {
+    fn cap_positions_below(&mut self, notional: u64) -> bool {
         self.c.position_cap = notional.saturating_sub(1);
+        true
     }
 }
 
@@ -299,17 +303,21 @@ impl Fixture for ExactFillVenue {
     fn unknown_market() -> MarketId {
         market_id("OTHER").expect("fits")
     }
-    fn make_mark_stale(&mut self) {
+    fn make_mark_stale(&mut self) -> bool {
         self.c.mark_age_secs = Self::MAX_MARK_AGE + 1;
+        true
     }
-    fn pause(&mut self) {
+    fn pause(&mut self) -> bool {
         self.c.paused = true;
+        true
     }
-    fn starve_collateral(&mut self) {
+    fn starve_collateral(&mut self) -> bool {
         self.c.collateral = 0;
+        true
     }
-    fn cap_positions_below(&mut self, notional: u64) {
+    fn cap_positions_below(&mut self, notional: u64) -> bool {
         self.c.position_cap = notional / 2;
+        true
     }
 }
 
@@ -374,17 +382,21 @@ impl Fixture for RequestVenue {
     fn unknown_market() -> MarketId {
         market_id("ASYNC-NOPE").expect("fits")
     }
-    fn make_mark_stale(&mut self) {
+    fn make_mark_stale(&mut self) -> bool {
         self.c.mark_age_secs = Self::MAX_MARK_AGE + 1;
+        true
     }
-    fn pause(&mut self) {
+    fn pause(&mut self) -> bool {
         self.c.paused = true;
+        true
     }
-    fn starve_collateral(&mut self) {
+    fn starve_collateral(&mut self) -> bool {
         self.c.collateral = 1;
+        true
     }
-    fn cap_positions_below(&mut self, notional: u64) {
+    fn cap_positions_below(&mut self, notional: u64) -> bool {
         self.c.position_cap = notional.saturating_sub(1);
+        true
     }
 }
 
@@ -454,10 +466,18 @@ fn the_suite_rejects_an_adapter_that_ignores_the_rules() {
         fn unknown_market() -> MarketId {
             market_id("X").expect("fits")
         }
-        fn make_mark_stale(&mut self) {}
-        fn pause(&mut self) {}
-        fn starve_collateral(&mut self) {}
-        fn cap_positions_below(&mut self, _n: u64) {}
+        fn make_mark_stale(&mut self) -> bool {
+            true
+        }
+        fn pause(&mut self) -> bool {
+            true
+        }
+        fn starve_collateral(&mut self) -> bool {
+            true
+        }
+        fn cap_positions_below(&mut self, _n: u64) -> bool {
+            true
+        }
     }
 
     let checks = markov_venue::conformance::run::<Rogue>();

@@ -37,24 +37,26 @@ impl BoundMark {
     }
 }
 
-/// Read the mark, or refuse. `Err` here means the gate must return
-/// `StaleOracle`; it never means "use the last price".
+/// Read the mark, or refuse. `None` means the gate must return
+/// `StaleOracle`; it never means "use the last price". There is no error
+/// detail on purpose — every way of failing to bind a mark is the same
+/// refusal, and the reasons are the SDK's to report, not ours to reinterpret.
 pub fn read_bound_mark(
     price_update: &Account<'_, PriceUpdateV2>,
     expected_account: &Pubkey,
     feed_id: &[u8; 32],
     max_age_secs: u64,
     clock: &Clock,
-) -> core::result::Result<BoundMark, ()> {
+) -> Option<BoundMark> {
     if price_update.key() != *expected_account {
-        return Err(());
+        return None;
     }
-    match price_update.get_price_no_older_than(clock, max_age_secs, feed_id) {
-        Ok(p) => Ok(BoundMark {
+    price_update
+        .get_price_no_older_than(clock, max_age_secs, feed_id)
+        .ok()
+        .map(|p| BoundMark {
             price: p.price,
             exponent: p.exponent,
             publish_time: p.publish_time,
-        }),
-        Err(_) => Err(()),
-    }
+        })
 }

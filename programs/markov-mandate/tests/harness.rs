@@ -5,7 +5,7 @@
 //! tests exercise the program rather than a pile of setup transactions.
 #![allow(dead_code, clippy::unwrap_used, clippy::expect_used)]
 
-use anchor_lang::{Discriminator, InstructionData, ToAccountMetas};
+use anchor_lang::{AnchorSerialize, Discriminator, InstructionData, ToAccountMetas};
 use litesvm::LiteSVM;
 use markov_mandate::state::{action_bits, Mandate, Policy, Registry};
 use solana_account::Account;
@@ -99,6 +99,15 @@ pub fn price_update_data(feed_id: [u8; 32], price: i64, publish_time: i64, slot:
         0,
     );
     d
+}
+
+/// Move the clock's **slot** forward. `warp_to_slot` moves the bank but not
+/// the `Clock` sysvar the program reads, and the venue judges its own mark's
+/// freshness in slots, so this is what makes a venue mark stale.
+pub fn set_clock_slot(svm: &mut LiteSVM, slot: u64) {
+    let mut clock: anchor_lang::solana_program::clock::Clock = svm.get_sysvar();
+    clock.slot = slot;
+    svm.set_sysvar(&clock);
 }
 
 pub fn set_clock(svm: &mut LiteSVM, unix_timestamp: i64) {
@@ -218,7 +227,8 @@ impl Env {
             Pubkey::find_program_address(&[Mandate::VAULT_SEED, mandate.as_ref()], &program);
 
         let market_id = MARKET_ID;
-        let (venue_market, _) = Pubkey::find_program_address(&[b"market", market_id.as_ref()], &venue);
+        let (venue_market, _) =
+            Pubkey::find_program_address(&[b"market", market_id.as_ref()], &venue);
         let (venue_mark, _) = Pubkey::find_program_address(&[b"mark", market_id.as_ref()], &venue);
         let (venue_position, _) =
             Pubkey::find_program_address(&[b"pos", mandate.as_ref(), market_id.as_ref()], &venue);
@@ -476,14 +486,14 @@ impl Env {
             program: self.program,
         }
         .to_account_metas(None);
-        // The venue's own accounts ride as remaining accounts; the mandate PDA
-        // is the signer the venue sees.
-        metas.push(
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                self.mandate,
-                false,
-            ),
-        );
+        // The venue's own accounts ride as remaining accounts, in the order
+        // demo_perps::VenueExecute declares them. The mandate PDA is the
+        // signer the venue sees; the mandate program marks it as such.
+        use anchor_lang::solana_program::instruction::AccountMeta as AM;
+        metas.push(AM::new_readonly(self.mandate, false));
+        metas.push(AM::new_readonly(self.venue_market, false));
+        metas.push(AM::new_readonly(self.venue_mark, false));
+        metas.push(AM::new(self.venue_position, false));
         let ix = self.ix(
             markov_mandate::instruction::ExecuteVenueAction { intent }.data(),
             metas,
@@ -493,8 +503,16 @@ impl Env {
 
     // ── demo_perps setup, through the venue's own instructions ────────────
 
-    pub fn venue_ix(&self, data: Vec<u8>, metas: Vec<solana_instruction::AccountMeta>) -> Instruction {
-        Instruction { program_id: self.venue, accounts: metas, data }
+    pub fn venue_ix(
+        &self,
+        data: Vec<u8>,
+        metas: Vec<solana_instruction::AccountMeta>,
+    ) -> Instruction {
+        Instruction {
+            program_id: self.venue,
+            accounts: metas,
+            data,
+        }
     }
 
     pub fn venue_init_market(&mut self) {
@@ -527,7 +545,12 @@ impl Env {
     pub fn venue_post_mark(&mut self, price_e6: i64) {
         let payer = self.payer.insecure_clone();
         let ix = self.venue_ix(
-            demo_perps::instruction::PostMark { price: price_e6, expo: -6, publish_time: NOW - 5 }.data(),
+            demo_perps::instruction::PostMark {
+                price: price_e6,
+                expo: -6,
+                publish_time: NOW - 5,
+            }
+            .data(),
             vec![
                 solana_instruction::AccountMeta::new_readonly(payer.pubkey(), true),
                 solana_instruction::AccountMeta::new_readonly(self.venue_market, false),
@@ -552,7 +575,11 @@ impl Env {
     pub fn venue_init_position(&mut self) {
         let payer = self.payer.insecure_clone();
         let ix = self.venue_ix(
-            demo_perps::instruction::InitPosition { mandate: self.mandate, market_id: MARKET_ID }.data(),
+            demo_perps::instruction::InitPosition {
+                mandate: self.mandate,
+                market_id: MARKET_ID,
+            }
+            .data(),
             vec![
                 solana_instruction::AccountMeta::new(payer.pubkey(), true),
                 solana_instruction::AccountMeta::new_readonly(self.venue_market, false),
@@ -564,6 +591,26 @@ impl Env {
             ],
         );
         self.send(ix, &[&payer]).expect("venue init_position");
+    }
+
+    /// Replay an old slot into the venue's mark account, which is what P04
+    /// asks for: the mark itself is stale, not the clock. Rewriting the
+    /// account is deterministic and does not depend on how the runtime
+    /// regenerates `Clock` between transactions.
+    pub fn venue_replay_old_mark(&mut self, slot: u64) {
+        let mut acc = self.svm.get_account(&self.venue_mark).unwrap();
+        let mut mark = demo_perps::MarkAccount::try_deserialize(&mut &acc.data[..]).unwrap();
+        mark.slot = slot;
+        let mut data = demo_perps::MarkAccount::DISCRIMINATOR.to_vec();
+        mark.serialize(&mut data).unwrap();
+        data.resize(acc.data.len(), 0);
+        acc.data = data;
+        self.svm.set_account(self.venue_mark, acc).unwrap();
+    }
+
+    pub fn venue_mark_state(&self) -> demo_perps::MarkAccount {
+        let acc = self.svm.get_account(&self.venue_mark).unwrap();
+        demo_perps::MarkAccount::try_deserialize(&mut &acc.data[..]).unwrap()
     }
 
     pub fn venue_position_state(&self) -> demo_perps::Position {

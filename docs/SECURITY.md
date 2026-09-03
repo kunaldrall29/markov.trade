@@ -16,7 +16,9 @@ Status: devnet. Unaudited. Marked PnL. Not a promised rate. **Stub written in P0
 2. Unaudited program.
 3. Delta / gross / daily-loss halt enforced off-chain in v0; on-chain in Phase 1.
 4. Mark source on devnet is the Pyth sponsored feed account (`docs/FACTS.md` `MARK_SOURCE`), relayed by a house poster only as a fallback and labelled as such.
-5. `demo_perps` is a mock venue with no token custody.
+5. `demo_perps` is a mock venue with **no token custody**, and that claim is checked rather than asserted: `scripts/no-token-custody.sh` fails the build if the source references a token program or a transfer CPI, if the built binary contains the SPL Token program id, or if any instruction name suggests moving value. Collateral never reaches the venue, so a bug in the mock cannot touch a vault.
+6. Its funding figure is a **fixed published devnet constant** (1e-6 of notional per slot, charged to the long), not a measured rate. Any surface showing it must say so.
+7. **With a real venue, a venue-level refusal would not produce a receipt** (ADR-008): a failed CPI fails the whole transaction, so only the mandate's own gates 1–12 are guaranteed to leave a record. `demo_perps` cooperates by reporting refusals as data; no real venue will.
 6. The predecessor program `5o8E…` and its mints are controlled by a key this project does not hold; nothing in Gate B depends on it.
 
 ## Invariants we test every build

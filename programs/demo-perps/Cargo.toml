@@ -29,12 +29,18 @@ markov-types = { path = "../../crates/markov-types", features = ["anchor"] }
 pyth-solana-receiver-sdk = "2.0.0"
 
 [dev-dependencies]
+# B11: the conformance suite runs against this program itself, in LiteSVM.
+markov-venue = { path = "../../crates/markov-venue" }
 # ADR-001: start at LiteSVM 0.16.0; fall back to the Anchor 1.1.2 template pin 0.10.0 if this fails to build.
 litesvm = "0.16.0"
 solana-message = "4"
 solana-transaction = "4"
 solana-signer = "3"
 solana-keypair = "3"
+solana-account = "4"
+solana-instruction = "3"
+solana-pubkey = "3"
+markov-types = { path = "../../crates/markov-types", features = ["anchor"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

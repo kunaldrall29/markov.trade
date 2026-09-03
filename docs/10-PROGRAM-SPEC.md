@@ -112,7 +112,7 @@ Implemented in `gates.rs` as one function per gate, called in this exact sequenc
 | 10 | `spend <= spend_per_call` / `day_spend_used + spend <= spend_daily` | `OverSpendCap` / `OverSpendDailyCap` |
 | 11 | `intent.max_slippage_bps <= policy` and quote within bound | `SlippageExceeded` |
 | 12 | `clock.unix_timestamp - mark.publish_time <= policy.max_mark_age_secs` (seconds, ADR-003; the mark account is bound: owner, feed id, `Full` verification) | `StaleOracle` |
-| 13 | CPI returns error | `VenueRejected` |
+| 13 | the venue **reports** a refusal, or reports nothing (ADR-008: a venue must not signal a refusal with a program error — a failed CPI fails the whole transaction, so no receipt could commit) | `VenueRejected` |
 | 14 | post-checks (vault delta, position delta, no authority change) | `PostCheckFailed` |
 
 **Post-checks, explicitly.** After the CPI returns: the vault's token balance changed by no more than the intent's notional plus fees; the vault's `owner` and `delegate` are unchanged; the mandate's `owner`, `operator`, and `policy` bytes are unchanged. Any drift → `PostCheckFailed`, and because the CPI already happened, the whole transaction reverts with a hard error so nothing lands. This is the one place where a refusal is allowed to be an `Err`: a state we cannot describe is a state we do not keep.
@@ -186,7 +186,7 @@ One trait, two consumers: the program CPIs into it, and the off-chain `markov-ve
 **Rules that make this a real seam, not a stub:**
 - Every write takes the **mandate PDA as the authority signer** — the operator key never signs to the venue directly.
 - Every write **reports what happened**: a `Fill { price, notional, fee }` the program can post-check, or an accepted request carrying no price (`VenueOutcome::Requested`). It may never invent a fill — see ADR-007. `demo_perps` is synchronous and only ever fills.
-- Errors are a fixed set: `MarketUnknown`, `StaleMark`, `SlippageExceeded`, `InsufficientCollateral`, `PositionLimit`, `VenuePaused`. A real venue's error space maps onto these; anything unmapped becomes `VenueRejected`.
+- Errors are a fixed set: `MarketUnknown`, `StaleMark`, `SlippageExceeded`, `InsufficientCollateral`, `PositionLimit`, `VenuePaused`. A real venue's error space maps onto these; anything unmapped becomes `VenueRejected`. **A venue reports these as return data with `Ok`, never as a program error** (ADR-008); program errors are reserved for structural faults and revert.
 - No method may take a `&str` price feed name or a client-supplied price. Marks come from an account.
 
 ## 7. `demo-perps`

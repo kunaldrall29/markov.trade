@@ -7,7 +7,7 @@
 //! keys and signatures.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use anchor_lang::{InstructionData, ToAccountMetas};
+use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use markov_mandate::state::{action_bits, Mandate, Policy, Registry};
 use solana_client::rpc_client::RpcClient;
 use solana_commitment_config::CommitmentConfig;
@@ -288,6 +288,145 @@ fn main() {
             program_id: program,
             accounts: exec_metas,
             data: markov_mandate::instruction::ExecuteVenueAction { intent: over_cap }.data(),
+        },
+        &operator,
+        &[&operator],
+    );
+
+    // ── P04: the venue is real, so set it up and take a real fill ────────
+    let market_id: [u8; 16] = *b"SOL-PERP\0\0\0\0\0\0\0\0";
+    let (venue_market, _) = Pubkey::find_program_address(&[b"market", market_id.as_ref()], &venue);
+    let (venue_mark, _) = Pubkey::find_program_address(&[b"mark", market_id.as_ref()], &venue);
+    let (venue_position, _) =
+        Pubkey::find_program_address(&[b"pos", mandate.as_ref(), market_id.as_ref()], &venue);
+    println!("venue market   {venue_market}");
+    println!("venue mark     {venue_mark}");
+    println!("venue position {venue_position}");
+
+    if rpc.get_account(&venue_market).is_err() {
+        send(
+            &rpc,
+            "venue init_market",
+            Instruction {
+                program_id: venue,
+                accounts: vec![
+                    AccountMeta::new(deployer.pubkey(), true),
+                    AccountMeta::new(venue_market, false),
+                    AccountMeta::new(venue_mark, false),
+                    AccountMeta::new_readonly(anchor_lang::solana_program::system_program::ID, false),
+                ],
+                data: demo_perps::instruction::InitMarket {
+                    args: demo_perps::InitMarketArgs {
+                        market_id,
+                        base_decimals: 9,
+                        fee_bps: 10,
+                        max_age_slots: 300,
+                        position_cap: 1_000_000_000,
+                        poster: key("mark-poster").pubkey(),
+                    },
+                }
+                .data(),
+            },
+            &deployer,
+            &[&deployer],
+        );
+    }
+
+    // Relay the Pyth price onto the venue's mark. `source` records `pyth`,
+    // which is what the page is allowed to say.
+    send(
+        &rpc,
+        "venue post_mark_from_pyth",
+        Instruction {
+            program_id: venue,
+            accounts: vec![
+                AccountMeta::new_readonly(venue_market, false),
+                AccountMeta::new(venue_mark, false),
+                AccountMeta::new_readonly(PYTH_SOL_USD, false),
+            ],
+            data: demo_perps::instruction::PostMarkFromPyth { feed_id: feed_id() }.data(),
+        },
+        &deployer,
+        &[&deployer],
+    );
+
+    if rpc.get_account(&venue_position).is_err() {
+        send(
+            &rpc,
+            "venue init_position",
+            Instruction {
+                program_id: venue,
+                accounts: vec![
+                    AccountMeta::new(deployer.pubkey(), true),
+                    AccountMeta::new_readonly(venue_market, false),
+                    AccountMeta::new(venue_position, false),
+                    AccountMeta::new_readonly(anchor_lang::solana_program::system_program::ID, false),
+                ],
+                data: demo_perps::instruction::InitPosition { mandate, market_id }.data(),
+            },
+            &deployer,
+            &[&deployer],
+        );
+    }
+
+    // Read the mark the venue just recorded, so the limit is derived from the
+    // real price rather than guessed.
+    let mark_e6: u64 = match rpc.get_account(&venue_mark) {
+        Ok(acc) => {
+            let m = demo_perps::MarkAccount::try_deserialize(&mut &acc.data[..]).expect("mark");
+            println!("mark           {} expo {} source {:?}", m.price, m.expo, m.source);
+            let shift = m.expo + 6;
+            if shift >= 0 {
+                (m.price as u128 * 10u128.pow(shift as u32)) as u64
+            } else {
+                (m.price as u128 / 10u128.pow((-shift) as u32)) as u64
+            }
+        }
+        Err(e) => panic!("mark unreadable: {e}"),
+    };
+    // The venue fills a long open at mark + 10 bps; ask for a limit 20 bps
+    // above the mark so the fill lands inside the bound and is visibly not
+    // the limit.
+    let limit = mark_e6 + mark_e6 * 20 / 10_000;
+
+    let mut open_metas = metas(markov_mandate::accounts::ExecuteVenueAction {
+        operator: operator.pubkey(),
+        registry,
+        mandate,
+        mint: USDC_D,
+        vault,
+        price_update: PYTH_SOL_USD,
+        venue_program: venue,
+        token_program: anchor_spl::token::ID,
+        event_authority,
+        program,
+    });
+    for m in [
+        AccountMeta::new_readonly(mandate, false),
+        AccountMeta::new_readonly(venue_market, false),
+        AccountMeta::new_readonly(venue_mark, false),
+        AccountMeta::new(venue_position, false),
+    ] {
+        open_metas.push(m);
+    }
+    let open = markov_mandate::gates::Intent {
+        intent_id: [(nonce as u8).wrapping_add(100); 32],
+        action: markov_types::ActionKind::Open,
+        market: market_id,
+        notional: 5_000_000, // 5 USDC-d, well inside the 50 per-tx cap
+        side: markov_types::Side::Long,
+        limit_price: limit,
+        max_slippage_bps: 50,
+        spend: 100_000,
+        forced: false,
+    };
+    send(
+        &rpc,
+        "execute (real fill)",
+        Instruction {
+            program_id: program,
+            accounts: open_metas,
+            data: markov_mandate::instruction::ExecuteVenueAction { intent: open }.data(),
         },
         &operator,
         &[&operator],

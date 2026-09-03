@@ -1660,9 +1660,13 @@ dependencies = [
  "anchor-lang",
  "litesvm",
  "markov-types",
+ "markov-venue",
  "pyth-solana-receiver-sdk",
+ "solana-account 4.3.2",
+ "solana-instruction",
  "solana-keypair",
  "solana-message",
+ "solana-pubkey 3.0.0",
  "solana-signer",
  "solana-transaction",
 ]
