@@ -35,6 +35,6 @@ pub enum MandateError {
     WrongMint,
     #[msg("wrong vault for this mandate")]
     WrongVault,
-    #[msg("post-check failed after the venue call: the vault, the owner, the operator or the policy moved")]
+    #[msg("post-check failed after the venue call: the vault, the owner, the operator or the policy moved, or the venue reported filling more than was asked")]
     PostCheckFailed,
 }

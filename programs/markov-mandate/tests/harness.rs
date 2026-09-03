@@ -342,11 +342,15 @@ impl Env {
     }
 
     pub fn create_mandate(&mut self, policy: Policy) {
+        self.create_mandate_with(policy, 0)
+    }
+
+    pub fn create_mandate_with(&mut self, policy: Policy, nonce: u64) {
         let args = markov_mandate::CreateMandateArgs {
             operator: self.operator.pubkey(),
             emergency: self.emergency.pubkey(),
             strategy_id: markov_mandate::BOOK_ONE,
-            nonce: 0,
+            nonce,
             policy,
             mark_account: self.price_update,
             feed_id: FEED_ID,
@@ -466,6 +470,75 @@ impl Env {
     pub fn withdraw(&mut self, amount: u64, signer: &Keypair) -> litesvm::types::TransactionResult {
         let dest = self.owner_ata;
         self.withdraw_to(amount, signer, dest)
+    }
+
+    /// Build an `Env` whose mandate already allows `venue`, so a test can
+    /// start from a policy that `amend_policy` (tighten-only) could never
+    /// reach — adding a venue is a widening.
+    pub fn new_with_venue(vault_amount: u64, venue: Pubkey) -> Env {
+        let mut env = Env::new(0);
+        // The policy must name *this* env's mint, which only exists once the
+        // env does.
+        let policy = policy(venue, env.mint, NOW + 86_400);
+        // A second mandate under a different nonce, with the policy asked for.
+        let strategy_id = markov_mandate::BOOK_ONE;
+        let nonce: u64 = 7;
+        let (mandate, _) = Pubkey::find_program_address(
+            &[
+                Mandate::SEED,
+                env.owner.pubkey().as_ref(),
+                strategy_id.as_ref(),
+                &nonce.to_le_bytes(),
+            ],
+            &env.program,
+        );
+        let (vault, _) =
+            Pubkey::find_program_address(&[Mandate::VAULT_SEED, mandate.as_ref()], &env.program);
+        env.mandate = mandate;
+        env.vault = vault;
+        env.venue = venue;
+        env.create_mandate_with(policy, nonce);
+        if vault_amount > 0 {
+            env.fund(vault_amount).expect("fund");
+        }
+        env
+    }
+
+    /// Send `execute_venue_action` at an arbitrary venue with arbitrary
+    /// remaining accounts, so a test can hand a hostile venue whatever it
+    /// would ask for.
+    pub fn execute_with_venue(
+        &mut self,
+        intent: markov_mandate::gates::Intent,
+        signer: &Keypair,
+        venue: Pubkey,
+        remaining: Vec<(Pubkey, bool, bool)>,
+    ) -> litesvm::types::TransactionResult {
+        let mut metas = markov_mandate::accounts::ExecuteVenueAction {
+            operator: signer.pubkey(),
+            registry: self.registry,
+            mandate: self.mandate,
+            mint: self.mint,
+            vault: self.vault,
+            price_update: self.price_update,
+            venue_program: venue,
+            token_program: anchor_spl::token::ID,
+            event_authority: self.event_authority,
+            program: self.program,
+        }
+        .to_account_metas(None);
+        for (pubkey, is_signer, is_writable) in remaining {
+            metas.push(anchor_lang::solana_program::instruction::AccountMeta {
+                pubkey,
+                is_signer,
+                is_writable,
+            });
+        }
+        let ix = self.ix(
+            markov_mandate::instruction::ExecuteVenueAction { intent }.data(),
+            metas,
+        );
+        self.send(ix, &[signer])
     }
 
     pub fn execute(

@@ -381,6 +381,54 @@ pub mod markov_mandate {
             return Ok(());
         }
 
+        // Gate 15: never hand a venue an account this mandate controls.
+        //
+        // A CPI carries the caller's signer privileges down to the callee, so
+        // inside the venue's own instruction the mandate PDA *is* a signer —
+        // and a venue holding the vault can therefore spend it with the
+        // mandate's authority, exactly as if the mandate had asked. This was
+        // measured, not assumed: before this gate existed, the rogue venue in
+        // `tests/mandate.rs` moved 10 base units out of a 1,000-unit vault and
+        // the transaction committed (ADR-009). A venue needs the mandate's
+        // signature to authorise a position; it never needs the collateral.
+        let vault_key = ctx.accounts.vault.key();
+        let mandate_key = ctx.accounts.mandate.key();
+        let controlled = ctx.remaining_accounts.iter().any(|a| {
+            let borrowed = a.try_borrow_data();
+            let data: &[u8] = match &borrowed {
+                Ok(d) => d,
+                // Unreadable is unknown, and unknown is refused.
+                Err(_) => return true,
+            };
+            cpi::venue::is_mandate_controlled(
+                &a.key(),
+                a.owner,
+                data,
+                &vault_key,
+                &mandate_key,
+                &anchor_spl::token::ID,
+            )
+        });
+        if controlled {
+            ctx.accounts.mandate.action_seq = seq;
+            emit_cpi!(RefusalReceipt {
+                seq,
+                intent_id: intent.intent_id,
+                mandate: mandate_key,
+                operator: signer,
+                strategy_id: ctx.accounts.mandate.strategy_id,
+                venue,
+                action: intent.action as u8,
+                notional: intent.notional,
+                reason: BlockReason::ControlledAccountForwarded,
+                gate_index: 15,
+                forced: intent.forced,
+                ts: now,
+                slot: clock.slot,
+            });
+            return Ok(());
+        }
+
         let bound = bound.ok_or(MandateError::PostCheckFailed)?;
         let before = snapshot(&ctx.accounts.vault, &ctx.accounts.mandate);
 
@@ -429,6 +477,19 @@ pub mod markov_mandate {
             &[seeds],
         )?;
 
+        // Gate 14, first: the vault, and the mandate's own roles and policy,
+        // must be exactly as they were. This runs *before* gate 13 reads the
+        // venue's report, because a venue that moved the vault and then
+        // reported a refusal would otherwise get a clean "the venue refused"
+        // receipt written over the theft. The gate numbers are reason labels,
+        // not an execution order.
+        ctx.accounts.vault.reload()?;
+        let after = snapshot(&ctx.accounts.vault, &ctx.accounts.mandate);
+        require!(
+            cpi::venue::post_checks_pass(&before, &after),
+            MandateError::PostCheckFailed
+        );
+
         // Gate 13: what did the venue say? A refusal reported as data commits
         // a receipt, which is the whole point of ADR-008. A fill is used as
         // reported. Silence is refused rather than filled in with the limit
@@ -456,18 +517,12 @@ pub mod markov_mandate {
                 return Ok(());
             }
         };
-        // A venue may fill less than asked, never more.
+        // Gate 14, second: a venue may fill less than asked, never more. Like
+        // the snapshot above this is an `Err`, not a receipt — a state we
+        // cannot describe is a state we do not keep, so the transaction
+        // reverts rather than committing a receipt known to be wrong.
         require!(
             fill.notional <= intent.notional,
-            MandateError::PostCheckFailed
-        );
-
-        // Gate 14: the only refusal allowed to be an `Err`. A state we cannot
-        // describe is a state we do not keep.
-        ctx.accounts.vault.reload()?;
-        let after = snapshot(&ctx.accounts.vault, &ctx.accounts.mandate);
-        require!(
-            cpi::venue::post_checks_pass(&before, &after, fill.notional),
             MandateError::PostCheckFailed
         );
 

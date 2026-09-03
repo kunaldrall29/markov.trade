@@ -600,3 +600,126 @@ fn the_counter_spends_the_filled_notional() {
     assert_eq!(a[0].notional, 40, "close did not report the held size");
     assert_eq!(e.venue_position_state().notional, 0);
 }
+
+/// The question any reviewer asks: the mandate PDA signs the CPI into the
+/// venue, so can a malicious venue turn round and spend the vault with it?
+///
+/// When this test was first written the answer was **yes**. A CPI carries the
+/// caller's signer privileges to the callee, so inside the venue's own
+/// instruction the mandate PDA is a signer, and the token program obeys it:
+/// `test_rogue_venue` moved 10 base units out of a 1,000-unit vault and the
+/// transaction committed `Ok`. Worse, it did so while reporting nothing, so
+/// gate 13 wrote a clean "the venue refused" receipt over the theft.
+///
+/// Gate 15 is the fix, and this is its test: the mandate refuses to forward an
+/// account it controls, so the attack never reaches the token program. See
+/// ADR-009.
+#[test]
+fn a_rogue_venue_is_never_handed_the_vault() {
+    let rogue = test_rogue_venue::ID;
+    // The rogue venue is allowed by both the policy and the registry, so the
+    // ladder's venue checks are not what stops it.
+    let mut e = Env::new_with_venue(1_000, rogue);
+    e.svm
+        .add_program(
+            rogue,
+            include_bytes!(concat!(
+                env!("CARGO_TARGET_TMPDIR"),
+                "/../deploy/test_rogue_venue.so"
+            )),
+        )
+        .expect("load the rogue venue");
+    e.set_adapters(vec![rogue]);
+
+    let thief = e.owner_ata; // somewhere the tokens would visibly land
+    let before_vault = e.vault_amount();
+    let before_thief = e.token_amount(&thief);
+
+    let operator = e.operator.insecure_clone();
+    let res = e.execute_with_venue(
+        intent(ActionKind::Open, 10, 90),
+        &operator,
+        rogue,
+        vec![
+            (e.mandate, false, false),
+            (e.vault, false, true),
+            (thief, false, true),
+            (anchor_spl::token::ID, false, false),
+        ],
+    );
+
+    // A refusal, not an error: the receipt names what was attempted.
+    let meta = res.expect("gate 15 refuses with a receipt, it does not revert");
+    let receipts = refusals(&meta);
+    assert_eq!(receipts.len(), 1, "expected exactly one RefusalReceipt");
+    assert_eq!(receipts[0].reason, BlockReason::ControlledAccountForwarded);
+    assert_eq!(receipts[0].gate_index, 15);
+
+    assert_eq!(e.vault_amount(), before_vault, "the vault moved");
+    assert_eq!(
+        e.token_amount(&thief),
+        before_thief,
+        "tokens reached the thief"
+    );
+    // The venue was never called, so it never got the chance to try.
+    assert!(
+        !meta.logs.iter().any(|l| l.contains("rogue venue")),
+        "the venue ran at all: {:?}",
+        meta.logs
+    );
+}
+
+/// Gate 14, end to end: a venue that reports filling more than it was asked
+/// for. Until this test the post-check was only exercised as a pure function,
+/// because no venue could produce the condition — `demo_perps` is honest by
+/// construction and nothing else could reach the CPI.
+///
+/// The rogue reports twice the notional. The mandate must not write that
+/// receipt: an over-filled position is a state it cannot describe, so the
+/// transaction reverts rather than committing a number nobody authorised.
+#[test]
+fn a_venue_that_reports_more_than_it_was_asked_for_reverts() {
+    let rogue = test_rogue_venue::ID;
+    let mut e = Env::new_with_venue(1_000, rogue);
+    e.svm
+        .add_program(
+            rogue,
+            include_bytes!(concat!(
+                env!("CARGO_TARGET_TMPDIR"),
+                "/../deploy/test_rogue_venue.so"
+            )),
+        )
+        .expect("load the rogue venue");
+    e.set_adapters(vec![rogue]);
+
+    let before_vault = e.vault_amount();
+    let seq_before = e.mandate_state().action_seq;
+    let operator = e.operator.insecure_clone();
+    // Only the mandate itself is forwarded, so gate 15 has nothing to refuse
+    // and the venue is reached. Its only remaining weapon is the lie.
+    let res = e.execute_with_venue(
+        intent(ActionKind::Open, 10, 90),
+        &operator,
+        rogue,
+        vec![(e.mandate, false, false)],
+    );
+
+    let err = res.expect_err("an over-fill must not commit");
+    assert!(
+        err.meta.logs.iter().any(|l| l.contains("PostCheckFailed")),
+        "reverted for the wrong reason: {:?}",
+        err.meta.logs
+    );
+    // The venue did run — it is the lie that was caught, not the call.
+    assert!(
+        err.meta
+            .logs
+            .iter()
+            .any(|l| l.contains("Instruction: VenueExecute")),
+        "the venue was never reached: {:?}",
+        err.meta.logs
+    );
+    // A reverted transaction leaves nothing behind.
+    assert_eq!(e.vault_amount(), before_vault);
+    assert_eq!(e.mandate_state().action_seq, seq_before);
+}

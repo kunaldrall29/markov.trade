@@ -40,11 +40,15 @@ pub enum BlockReason {
     GlobalHalt = 14,
     VenueRejected = 15,
     PostCheckFailed = 16,
+    /// The caller handed the venue an account this mandate controls. A CPI
+    /// carries the caller's signer privileges to the callee, so a venue given
+    /// the vault could spend it with the mandate's own authority (ADR-009).
+    ControlledAccountForwarded = 17,
 }
 
 impl BlockReason {
     /// Every variant, in discriminant order. The append-only test reads this.
-    pub const ALL: [BlockReason; 17] = [
+    pub const ALL: [BlockReason; 18] = [
         BlockReason::OverTxCap,
         BlockReason::OverDailyCap,
         BlockReason::OverSpendCap,
@@ -62,6 +66,7 @@ impl BlockReason {
         BlockReason::GlobalHalt,
         BlockReason::VenueRejected,
         BlockReason::PostCheckFailed,
+        BlockReason::ControlledAccountForwarded,
     ];
 
     /// The name exactly as it appears on a receipt, in mono, verbatim.
@@ -84,6 +89,7 @@ impl BlockReason {
             BlockReason::GlobalHalt => "GlobalHalt",
             BlockReason::VenueRejected => "VenueRejected",
             BlockReason::PostCheckFailed => "PostCheckFailed",
+            BlockReason::ControlledAccountForwarded => "ControlledAccountForwarded",
         }
     }
 
@@ -302,6 +308,10 @@ mod tests {
         for (i, r) in BlockReason::ALL.iter().enumerate() {
             assert_eq!(*r as usize, i);
         }
-        assert_eq!(BlockReason::from_u8(17), None);
+        // One past the end: an unknown byte is `None`, never a guess. Bump
+        // this with the enum — a stale bound would silently stop testing the
+        // decoder's edge.
+        assert_eq!(BlockReason::ALL.len(), 18);
+        assert_eq!(BlockReason::from_u8(18), None);
     }
 }

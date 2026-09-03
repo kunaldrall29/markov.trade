@@ -3009,6 +3009,7 @@ dependencies = [
  "solana-signer",
  "solana-system-interface 2.0.0",
  "solana-transaction",
+ "test_rogue_venue",
 ]
 
 [[package]]
@@ -7187,6 +7188,15 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "test_rogue_venue"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "markov-types",
 ]
 
 [[package]]

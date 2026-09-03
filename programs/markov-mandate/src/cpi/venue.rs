@@ -95,7 +95,7 @@ pub struct VaultSnapshot {
 /// not change. Anything else is a state we cannot describe, so the whole
 /// transaction reverts (`PostCheckFailed`, the one refusal allowed to be an
 /// `Err`).
-pub fn post_checks_pass(before: &VaultSnapshot, after: &VaultSnapshot, notional: u64) -> bool {
+pub fn post_checks_pass(before: &VaultSnapshot, after: &VaultSnapshot) -> bool {
     if after.owner != before.owner
         || after.has_delegate
         || after.mandate_owner != before.mandate_owner
@@ -104,7 +104,37 @@ pub fn post_checks_pass(before: &VaultSnapshot, after: &VaultSnapshot, notional:
     {
         return false;
     }
-    before.balance.abs_diff(after.balance) <= notional
+    // A Gate B venue takes no custody (`scripts/no-token-custody.sh`), so the
+    // vault must be *exactly* as it was. This was once `<= notional`, to leave
+    // room for a venue that collects collateral; that tolerance is what let a
+    // rogue venue take `notional` out of the vault and still pass (ADR-009).
+    // A custody venue is Gate C work and needs its own accounting, not a
+    // tolerance band.
+    before.balance == after.balance
+}
+
+/// True when `key` is an account this mandate controls, and which therefore
+/// must never be forwarded to a venue.
+///
+/// The vault is named directly; any other SPL token account whose authority is
+/// the mandate PDA is caught by its layout — `mint(32) || authority(32) || …`.
+/// Taking the parts rather than an `AccountInfo` keeps this testable off
+/// chain, which matters because it is the check that stops ADR-009's attack.
+pub fn is_mandate_controlled(
+    key: &Pubkey,
+    owner_program: &Pubkey,
+    data: &[u8],
+    vault: &Pubkey,
+    mandate: &Pubkey,
+    token_program: &Pubkey,
+) -> bool {
+    if key == vault {
+        return true;
+    }
+    if owner_program != token_program {
+        return false;
+    }
+    data.len() >= 64 && data[32..64] == mandate.to_bytes()
 }
 
 #[cfg(test)]
@@ -123,19 +153,80 @@ mod tests {
     }
 
     #[test]
-    fn a_fill_inside_the_notional_passes() {
-        let before = snap();
-        let mut after = snap();
-        after.balance = 950;
-        assert!(post_checks_pass(&before, &after, 50));
+    fn an_untouched_vault_passes() {
+        assert!(post_checks_pass(&snap(), &snap()));
     }
 
+    /// Any movement at all, in either direction. A venue that can take one
+    /// base unit out of the vault can take the rest of it a block later.
     #[test]
-    fn a_vault_that_moved_more_than_the_notional_fails() {
-        let before = snap();
-        let mut after = snap();
-        after.balance = 900;
-        assert!(!post_checks_pass(&before, &after, 50));
+    fn a_vault_that_moved_at_all_fails() {
+        for balance in [999, 1_001, 0] {
+            let mut after = snap();
+            after.balance = balance;
+            assert!(
+                !post_checks_pass(&snap(), &after),
+                "a vault that moved to {balance} passed the post-check"
+            );
+        }
+    }
+
+    fn token_account(authority: &Pubkey) -> Vec<u8> {
+        let mut data = vec![0u8; 165];
+        data[32..64].copy_from_slice(&authority.to_bytes());
+        data
+    }
+
+    /// The check that stops ADR-009: a venue handed one of these could spend
+    /// it with the mandate's own signature.
+    #[test]
+    fn the_vault_and_any_mandate_owned_token_account_are_controlled() {
+        let vault = Pubkey::new_from_array([1; 32]);
+        let mandate = Pubkey::new_from_array([2; 32]);
+        let token = Pubkey::new_from_array([3; 32]);
+        let other = Pubkey::new_from_array([4; 32]);
+
+        // The vault, whatever its contents say.
+        assert!(is_mandate_controlled(
+            &vault,
+            &token,
+            &[],
+            &vault,
+            &mandate,
+            &token
+        ));
+        // A second token account with the mandate as authority.
+        assert!(is_mandate_controlled(
+            &other,
+            &token,
+            &token_account(&mandate),
+            &vault,
+            &mandate,
+            &token
+        ));
+        // Someone else's token account is not ours to refuse.
+        assert!(!is_mandate_controlled(
+            &other,
+            &token,
+            &token_account(&other),
+            &vault,
+            &mandate,
+            &token
+        ));
+        // A non-token account that happens to hold the mandate's bytes at
+        // that offset is not a token account, and the owner program says so.
+        assert!(!is_mandate_controlled(
+            &other,
+            &other,
+            &token_account(&mandate),
+            &vault,
+            &mandate,
+            &token
+        ));
+        // Too short to be a token account.
+        assert!(!is_mandate_controlled(
+            &other, &token, &[0u8; 40], &vault, &mandate, &token
+        ));
     }
 
     #[test]
@@ -143,7 +234,7 @@ mod tests {
         let before = snap();
         let mut after = snap();
         after.owner = Pubkey::new_from_array([9; 32]);
-        assert!(!post_checks_pass(&before, &after, 50));
+        assert!(!post_checks_pass(&before, &after));
     }
 
     #[test]
@@ -151,7 +242,7 @@ mod tests {
         let before = snap();
         let mut after = snap();
         after.has_delegate = true;
-        assert!(!post_checks_pass(&before, &after, 50));
+        assert!(!post_checks_pass(&before, &after));
     }
 
     #[test]
@@ -164,7 +255,7 @@ mod tests {
         ] {
             let mut after = snap();
             mutate(&mut after);
-            assert!(!post_checks_pass(&before, &after, 50));
+            assert!(!post_checks_pass(&before, &after));
         }
     }
 

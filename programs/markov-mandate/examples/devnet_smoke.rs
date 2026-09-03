@@ -313,7 +313,10 @@ fn main() {
                     AccountMeta::new(deployer.pubkey(), true),
                     AccountMeta::new(venue_market, false),
                     AccountMeta::new(venue_mark, false),
-                    AccountMeta::new_readonly(anchor_lang::solana_program::system_program::ID, false),
+                    AccountMeta::new_readonly(
+                        anchor_lang::solana_program::system_program::ID,
+                        false,
+                    ),
                 ],
                 data: demo_perps::instruction::InitMarket {
                     args: demo_perps::InitMarketArgs {
@@ -360,7 +363,10 @@ fn main() {
                     AccountMeta::new(deployer.pubkey(), true),
                     AccountMeta::new_readonly(venue_market, false),
                     AccountMeta::new(venue_position, false),
-                    AccountMeta::new_readonly(anchor_lang::solana_program::system_program::ID, false),
+                    AccountMeta::new_readonly(
+                        anchor_lang::solana_program::system_program::ID,
+                        false,
+                    ),
                 ],
                 data: demo_perps::instruction::InitPosition { mandate, market_id }.data(),
             },
@@ -374,7 +380,10 @@ fn main() {
     let mark_e6: u64 = match rpc.get_account(&venue_mark) {
         Ok(acc) => {
             let m = demo_perps::MarkAccount::try_deserialize(&mut &acc.data[..]).expect("mark");
-            println!("mark           {} expo {} source {:?}", m.price, m.expo, m.source);
+            println!(
+                "mark           {} expo {} source {:?}",
+                m.price, m.expo, m.source
+            );
             let shift = m.expo + 6;
             if shift >= 0 {
                 (m.price as u128 * 10u128.pow(shift as u32)) as u64

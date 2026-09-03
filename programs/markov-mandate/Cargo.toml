@@ -44,6 +44,8 @@ solana-instruction = "3"
 solana-pubkey = "3"
 # The mandate CPIs into the mock venue; the tests need its ID and its .so.
 demo_perps = { path = "../demo-perps", features = ["no-entrypoint"] }
+# TEST ONLY: proves a venue cannot touch the vault (never deployed).
+test_rogue_venue = { path = "../test-rogue-venue", features = ["no-entrypoint"] }
 # Devnet evidence runner (examples/devnet_smoke.rs). Host-only; the SBF build
 # never sees these. P07 folds this into crates/markov-chain.
 solana-client = "4.2.2"
