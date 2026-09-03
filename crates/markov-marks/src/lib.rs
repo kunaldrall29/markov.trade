@@ -37,6 +37,24 @@ impl Mark {
     pub fn age_slots(&self) -> u64 {
         self.observed_slot.saturating_sub(self.posted_slot)
     }
+
+    /// The price rescaled to 1e6, the integer scale the program, the guard and
+    /// every surface use.
+    ///
+    /// `None` rather than a fallback: a negative price is not a price, and a
+    /// rescaling that overflows is a number we cannot state. A saturated or
+    /// zeroed value here would become a mark the book traded on.
+    pub fn price_e6(&self) -> Option<u64> {
+        let p = u64::try_from(self.price).ok()?;
+        let shift = self.exponent.checked_add(6)?;
+        if shift >= 0 {
+            let factor = 10u64.checked_pow(u32::try_from(shift).ok()?)?;
+            p.checked_mul(factor)
+        } else {
+            let factor = 10u64.checked_pow(u32::try_from(shift.checked_neg()?).ok()?)?;
+            Some(p / factor)
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -312,6 +330,43 @@ impl MarkSource for Replay {
     }
     fn name(&self) -> &'static str {
         "replay"
+    }
+}
+
+#[cfg(test)]
+mod price_e6_tests {
+    use super::*;
+
+    fn mark(price: i64, exponent: i32) -> Mark {
+        Mark {
+            price,
+            conf: 0,
+            exponent,
+            publish_time: 0,
+            posted_slot: 0,
+            observed_slot: 0,
+            source: "test",
+        }
+    }
+
+    #[test]
+    fn rescales_to_1e6_both_ways() {
+        // Pyth's devnet SOL/USD is expo -8: 10429498839 is $104.29498839.
+        assert_eq!(mark(10_429_498_839, -8).price_e6(), Some(104_294_988));
+        // An exponent coarser than 1e6 scales up instead of down.
+        assert_eq!(mark(104, 0).price_e6(), Some(104_000_000));
+        assert_eq!(mark(1_042_949, -4).price_e6(), Some(104_294_900));
+    }
+
+    #[test]
+    fn a_price_we_cannot_state_is_none_not_a_fallback() {
+        assert_eq!(mark(-1, -8).price_e6(), None, "negative is not a price");
+        assert_eq!(
+            mark(i64::MAX, 0).price_e6(),
+            None,
+            "overflow is not a price"
+        );
+        assert_eq!(mark(1, 300).price_e6(), None, "absurd exponent");
     }
 }
 

@@ -430,6 +430,7 @@ mod tests {
             intent: "skip".to_string(),
             verdict: verdict.to_string(),
             reason: reason.map(str::to_string),
+            reason_enforcement: reason.map(|_| "on_chain".to_string()),
             latency_ms: 5,
             error: None,
         }

@@ -8,4 +8,12 @@ description = "The pure risk guard: (Intent, GuardState, PolicyView) -> Verdict.
 publish = false
 
 [dependencies]
-markov-types = { path = "../markov-types" }
+markov-types = { path = "../markov-types", features = ["serde"] }
+# Derive only. `serde` core is `no_std` and does no I/O; it is here so the
+# fixtures in `src/fixtures/` are data the guard itself can parse, rather than
+# Rust literals that drift away from the JSON the API serves.
+serde = { version = "1", default-features = false, features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"
+

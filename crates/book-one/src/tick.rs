@@ -1,7 +1,7 @@
 //! One tick: read the mark, build features, propose, guard, record.
 
 use chrono::{DateTime, Utc};
-use markov_guard::{evaluate, GuardState, PolicyView, Verdict};
+use markov_guard::{evaluate, ActionKind, GuardState, MandateState, PolicyView, Verdict};
 use markov_marks::{MarkError, MarkSource};
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +25,10 @@ pub struct TickRecord {
     pub intent: String,
     pub verdict: String,
     pub reason: Option<String>,
+    /// `on_chain` or `off_chain_v0` for a veto, absent otherwise. Defaulted so
+    /// tick logs written before this field existed still parse.
+    #[serde(default)]
+    pub reason_enforcement: Option<String>,
     pub latency_ms: u64,
     pub error: Option<String>,
 }
@@ -37,19 +41,61 @@ pub async fn run_tick<S: MarkSource>(cfg: &Config, source: &mut S, n: u64) -> Ti
     let now: DateTime<Utc> = Utc::now();
     let feats = StubSidecar.features();
     let intent = crate::core::propose(&feats);
+    // Shadow mode holds no mandate and no position, so the exposure, the
+    // counters and the equity are all genuinely zero — not unknown, and not
+    // defaulted to make a rule pass. The guard's daily-loss rule does not fire
+    // on a zero session-start equity, which is the correct behaviour for a book
+    // that has never had any: the caps above are what bound it.
     let state = GuardState {
         now_unix: now.timestamp(),
+        slot: mark.as_ref().ok().map(|m| m.observed_slot).unwrap_or(0),
+        state: MandateState::Active,
+        mark_e6: mark.as_ref().ok().and_then(|m| m.price_e6()),
         mark_publish_time: mark.as_ref().ok().map(|m| m.publish_time),
+        net_delta: 0,
+        gross: 0,
+        vault_balance: 0,
+        day_notional_used: 0,
+        day_spend_used: 0,
+        session_start_equity: 0,
+        equity: 0,
     };
     let policy = PolicyView {
         max_mark_age_secs: cfg.max_mark_age_secs,
+        allowed_actions: PolicyView::actions_mask(&[
+            ActionKind::Open,
+            ActionKind::Increase,
+            ActionKind::Reduce,
+            ActionKind::Close,
+            ActionKind::Flatten,
+        ]),
         per_tx_cap: cfg.per_tx_cap,
+        daily_cap: cfg.daily_cap,
+        spend_cap: cfg.spend_cap,
+        spend_daily_cap: cfg.spend_daily_cap,
+        max_slippage_bps: cfg.max_slippage_bps,
+        delta_band: cfg.delta_band,
+        max_gross: cfg.max_gross,
+        daily_loss_bps: cfg.daily_loss_bps,
     };
     let verdict = evaluate(&intent, &state, &policy);
-    let (verdict_name, reason) = match verdict {
-        Verdict::Allow(_) => ("allow", None),
-        Verdict::Veto(r) => ("veto", Some(r.name().to_string())),
-        Verdict::Skip => ("skip", None),
+    let (verdict_name, reason, enforcement) = match verdict {
+        Verdict::Allow(_) => ("allow", None, None),
+        // The tape carries where the veto is enforced, so no surface reading
+        // it has to guess whether "DeltaBandExceeded" is a chain guarantee.
+        Verdict::Veto(r) => (
+            "veto",
+            Some(r.name().to_string()),
+            Some(
+                if r.is_off_chain() {
+                    "off_chain_v0"
+                } else {
+                    "on_chain"
+                }
+                .to_string(),
+            ),
+        ),
+        Verdict::Skip => ("skip", None, None),
     };
     let error = match &mark {
         Ok(_) => None,
@@ -71,6 +117,7 @@ pub async fn run_tick<S: MarkSource>(cfg: &Config, source: &mut S, n: u64) -> Ti
         intent: action_name(intent.action).to_string(),
         verdict: verdict_name.to_string(),
         reason,
+        reason_enforcement: enforcement,
         latency_ms: t0.elapsed().as_millis() as u64,
         error,
     }

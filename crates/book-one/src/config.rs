@@ -19,6 +19,16 @@ pub struct Config {
     pub sol_usd_feed_id: [u8; 32],
     pub max_mark_age_secs: i64,
     pub per_tx_cap: u64,
+    pub daily_cap: u64,
+    pub spend_cap: u64,
+    pub spend_daily_cap: u64,
+    pub max_slippage_bps: u16,
+    /// Ceiling on `|net delta|`, and on gross exposure, in mint base units.
+    /// Enforced by the guard only in v0 (ADR-005).
+    pub delta_band: u128,
+    pub max_gross: u128,
+    /// 500 = stop for the day once equity is 5% below the session's start.
+    pub daily_loss_bps: u16,
     pub paper_dir: PathBuf,
     pub paper_start_date: Option<chrono::NaiveDate>,
     pub max_ticks: Option<u64>,
@@ -84,6 +94,34 @@ impl Config {
                 .map(|v| v.parse())
                 .transpose()?
                 .unwrap_or(50),
+            daily_cap: env("DAILY_CAP")
+                .map(|v| v.parse())
+                .transpose()?
+                .unwrap_or(200),
+            spend_cap: env("SPEND_CAP")
+                .map(|v| v.parse())
+                .transpose()?
+                .unwrap_or(50),
+            spend_daily_cap: env("SPEND_DAILY_CAP")
+                .map(|v| v.parse())
+                .transpose()?
+                .unwrap_or(200),
+            max_slippage_bps: env("MAX_SLIPPAGE_BPS")
+                .map(|v| v.parse())
+                .transpose()?
+                .unwrap_or(50),
+            delta_band: env("DELTA_BAND")
+                .map(|v| v.parse())
+                .transpose()?
+                .unwrap_or(200),
+            max_gross: env("MAX_GROSS")
+                .map(|v| v.parse())
+                .transpose()?
+                .unwrap_or(400),
+            daily_loss_bps: env("DAILY_LOSS_BPS")
+                .map(|v| v.parse())
+                .transpose()?
+                .unwrap_or(500),
             paper_dir: PathBuf::from(env("PAPER_DIR").unwrap_or_else(|| "paper".to_string())),
             paper_start_date,
             max_ticks: env("MAX_TICKS").map(|v| v.parse()).transpose()?,

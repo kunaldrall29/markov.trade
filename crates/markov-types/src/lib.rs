@@ -117,6 +117,7 @@ impl BlockReason {
 // The wire byte IS the explicit discriminant: 0-10 are exactly what the
 // predecessor emitted on devnet, so the encoding must not renumber them.
 #[cfg_attr(feature = "anchor", borsh(use_discriminant = true))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub enum ActionKind {
     Skip = 0,
     Open = 1,
@@ -141,6 +142,7 @@ pub enum ActionKind {
 // The wire byte IS the explicit discriminant: 0-10 are exactly what the
 // predecessor emitted on devnet, so the encoding must not renumber them.
 #[cfg_attr(feature = "anchor", borsh(use_discriminant = true))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub enum Side {
     Long = 0,
     Short = 1,

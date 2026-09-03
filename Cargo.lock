@@ -2959,6 +2959,8 @@ name = "markov-guard"
 version = "0.1.0"
 dependencies = [
  "markov-types",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2976,6 +2978,7 @@ name = "markov-types"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "serde",
 ]
 
 [[package]]

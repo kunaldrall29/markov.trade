@@ -2,6 +2,30 @@
 
 One `##` per session, newest first. Facts, not narrative. What was verified, how, and what was not.
 
+## 2026-09-03 (S2) — the attacker won, then P05
+
+- **A venue could spend the vault with the mandate's own signature, and I had asserted the opposite three times.** I wrote `programs/test-rogue-venue` to confirm "a venue cannot touch the vault". Handed the vault, it issued an ordinary SPL `Transfer` with the mandate PDA as authority: **vault 1000 → 990, thief 999000 → 999010, transaction `Ok`**. Signer privileges propagate down a CPI chain; only the *creation* of a PDA signature is restricted to the owning program. Compounding it, the rogue reported nothing, so gate 13 wrote a clean `VenueRejected` receipt over the theft — the vault snapshot only ran on the success path.
+- **Fixed three ways.** Gate 15 (`ControlledAccountForwarded`, `BlockReason` 17) refuses to forward the vault or any SPL token account whose authority is the mandate PDA; the snapshot is compared **before any receipt commits**; and the snapshot now requires the vault to be *unchanged* rather than within the notional — that tolerance, left for a future custody venue, is what let the theft pass. ADR-009 records the finding, the two rejected alternatives and the Gate C constraint it creates.
+- **Deployed to devnet** at slot 492602088, signature `3dhzc3Y7…`. Every receipt this program emitted before that slot came from the vulnerable build; none is a Gate B proof.
+- **Gate 14 got its first end-to-end trigger** as a by-product: the rogue also reports twice the notional it was asked for, and the mandate reverts with `PostCheckFailed` instead of writing a receipt for a size nobody authorised. That closes a BACKLOG item open since P02. The *snapshot* clause of gate 14 is now unreachable by construction, because gate 15 prevents its precondition — stated rather than hidden.
+- **P05 (the guard).** All ten rules of `docs/11` §4 in that order, `#![no_std]`, nine crates in its tree and none able to do I/O. The order is pinned by a test that breaks every rule at once and repairs them one at a time, asserting each repair reveals exactly the next reason down the ladder. 16 JSON fixtures, one per reason plus allow and skip, each asserting the reason **and** the enforcement tag; `every_fixture_has_a_test` fails if either side drifts. Nine ways to hand it an unusable input, none of which returns `Allow`.
+- **The enforcement tag is structural, not a list.** `GuardReason` is `OnChain(BlockReason)` or `OffChainV0(OffChainReason)`, so nothing can call the delta band "enforced" without the qualifier. `book-one` tick rows now carry `reason_enforcement`.
+- **The guard's 20-line plain-words page**, as P05 requires it be writable:
+
+  > The guard is one function. Every tick, the core proposes something and the guard decides whether it may happen. It is handed everything it needs — the time, the mark and when the mark was published, the current positions, the day's counters, the policy's limits — and it reads nothing for itself. It has no clock, no socket, no log, and no memory of the last tick.
+  >
+  > It answers one of three ways. **Skip** means the core proposed nothing and nothing was wrong. **Allow** means every rule passed. **Veto** means one rule failed, and the answer names which.
+  >
+  > The rules run in a fixed order that mirrors the program's own ladder, so that if the guard and the chain ever disagree, the disagreement is visible rather than silent: is the mandate live, is the mark fresh, is this action permitted, is it too big for one trade, too big for the day, too much spend, does it push the book past its delta band or its gross ceiling, is the price too far from the mark, and has the day already lost enough to stop.
+  >
+  > Three of those — the delta band, the gross ceiling and the daily-loss halt — are enforced here and nowhere else in v0. The type says so, so that no surface can call them "enforced" without the qualifier.
+  >
+  > Anything missing, contradictory, or too large to compute is a veto. There is no path that allows on a `None`.
+
+- **Hosting.** `apps/web` redeployed to production and aliased to `markov.trade`; `devnet.markov.trade` added to the Vercel project and verified, serving the same deployment (ADR-002's one origin kept). It does not resolve yet — the Cloudflare zone needs `CNAME devnet → cname.vercel-dns.com`, proxy off, which only Kunal can add. The repo is now pushed to `github.com/kunaldrall29/markov.trade` over SSH; the `gh` OAuth token lacks the `workflow` scope and rejected the push over HTTPS.
+- **102 tests green**, 0 failures; fmt, clippy `-D warnings` (CI's exact command), guard purity, guard ban list and the key scan all clean.
+- **Not done:** P06 and P07.
+
 ## 2026-09-02 (P04) — the mock venue, and a bug P02 had shipped
 
 - **P04 (B11 green).** `demo_perps` is a real venue now: `Market`, `MarkAccount`, `Position` PDAs; deterministic fills at `mark ± fee_bps` where a taker never gets a better price than the mark; its own on-chain freshness gate independent of the mandate's; funding at a published devnet constant charged to the long; and `post_mark_from_pyth`, which relays the Pyth account and records **`source: Pyth`** on chain so a page can state where the price came from. Zero token custody, checked three ways by `scripts/no-token-custody.sh`.

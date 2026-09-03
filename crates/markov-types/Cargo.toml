@@ -12,6 +12,12 @@ default = []
 # Derives Anchor's borsh + IDL traits so the on-chain program and the services
 # share one BlockReason definition (docs/07 §4).
 anchor = ["dep:anchor-lang"]
+# Lets the guard's JSON fixtures name an `ActionKind` or a `Side`. Never
+# enabled for the on-chain build.
+serde = ["dep:serde"]
 
 [dependencies]
 anchor-lang = { version = "1.1.2", optional = true }
+serde = { version = "1", default-features = false, features = [
+  "derive",
+], optional = true }

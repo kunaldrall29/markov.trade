@@ -1,0 +1,43 @@
+{
+  "name": "expired",
+  "why": "The policy's end date has passed. The caller derives this; the guard never reads a clock to decide it.",
+  "expect": {
+    "veto": {
+      "reason": "Expired",
+      "enforcement": "OnChain"
+    }
+  },
+  "intent": {
+    "action": "Open",
+    "side": "Long",
+    "notional": 10000,
+    "limit_price_e6": 100200000,
+    "spend": 1000
+  },
+  "state": {
+    "now_unix": 1788400000,
+    "slot": 492600000,
+    "state": "Expired",
+    "mark_e6": 100000000,
+    "mark_publish_time": 1788399995,
+    "net_delta": 0,
+    "gross": 0,
+    "vault_balance": 1000000,
+    "day_notional_used": 0,
+    "day_spend_used": 0,
+    "session_start_equity": 1000000,
+    "equity": 1000000
+  },
+  "policy": {
+    "max_mark_age_secs": 150,
+    "allowed_actions": 62,
+    "per_tx_cap": 50000,
+    "daily_cap": 200000,
+    "spend_cap": 10000,
+    "spend_daily_cap": 40000,
+    "max_slippage_bps": 50,
+    "delta_band": 100000,
+    "max_gross": 300000,
+    "daily_loss_bps": 500
+  }
+}
