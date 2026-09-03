@@ -8,3 +8,10 @@ description = "VenueAdapter trait plus the demo_perps client; the Gate C seam (B
 publish = false
 
 [dependencies]
+markov-types = { path = "../markov-types" }
+solana-pubkey = "3"
+thiserror = "2"
+
+[dev-dependencies]
+# The conformance suite runs against two adapters to prove it is not written
+# around one of them.

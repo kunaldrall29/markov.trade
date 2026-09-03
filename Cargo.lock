@@ -2975,6 +2975,11 @@ dependencies = [
 [[package]]
 name = "markov-venue"
 version = "0.1.0"
+dependencies = [
+ "markov-types",
+ "solana-pubkey 3.0.0",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "markov_mandate"

@@ -2,6 +2,14 @@
 
 One `##` per session, newest first. Facts, not narrative. What was verified, how, and what was not.
 
+## 2026-09-02 (later still) — public RPC, then P03: the venue adapter trait
+
+- **Public RPC, completed.** 64 endpoints probed in total: 44 by agents, then the 20 whose agents hit a session limit directly with the same script. Primary `https://rpc.magicblock.app/devnet` (keyless, 25/25 concurrent clean, and it finished the chunked IDL publish three others could not); fallback `https://api.devnet.solana.com` (serial-friendly, 62 of 100 rejected at concurrency 50); WebSocket `wss://api.devnet.solana.com` with **limits measured, not inferred** — 40/40 subscriptions on one socket, ceiling on *sockets* at 10, which is the opposite shape from Triton's advertised `pubsub-limit: 10` and suits P09's one-socket design with 10× headroom. Corrected my own Tatum row (5 requests per *minute*, no `getSignaturesForAddress` for anonymous, WebSocket behind payment) and recorded six wrong-network traps including `devnet-router.magicblock.app`, one hostname from the primary.
+- **Both IDLs on chain**, and the earlier "PENDING, 429" row was wrong: the mandate's IDL was written on the first attempt and the later errors were `init` refusing to run twice. Anchor 1.x uses program-metadata accounts, not the old IDL PDA.
+- **P03 (B11).** `crates/markov-venue` defines the seam; the conformance suite is a library so it can be pointed at any adapter with no assertion changes, proven against three unlike adapters plus a rogue that it correctly fails on five checks.
+- **The suite found a hole in the pack's design before I did.** `docs/10` §6 requires every write to return a `Fill`; a request/fulfilment venue has none at CPI time and could only invent one, which would ride into an `ActionReceipt`. Writes now return `Filled` or `Requested`; Gate B only sees `Filled`; ADR-007 records the Gate C consequence and §6 is amended.
+- **Not done:** gates 13/14 still unexercised end to end (P04); the venue-shape research workflow was still running when this was committed, so ADR-007 rests on my own reasoning plus the `RequestVenue` test rather than on a survey of named venues.
+
 ## 2026-09-02 (later) — P02: the mandate program, deployed
 
 - **Written and deployed.** `programs/markov-mandate` is the real lock now: `Mandate`/`Policy`/`Registry`, the 14-gate ladder in `gates.rs` (one function per rung, first failure wins and names its index), receipts via `emit_cpi!`, tighten-only `amend_policy`, an 8-slot replay ring, UTC-day rollover, and the Pyth mark bound three ways (owner, feed id, `Full`) before it is a price. `owner_withdraw` has no state check anywhere in its path. Upgraded on devnet at slot 492045049; `demo_perps` deployed alongside with only the `venue_execute` entry point P04 will flesh out.

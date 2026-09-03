@@ -28,8 +28,7 @@ fn rpc_url() -> String {
 }
 const USDC_D: Pubkey = solana_pubkey::pubkey!("7ajorFYMrE9Mi3yZkwWaZp6ahzkK6RotZ75qAdtTV9Rj");
 const SOL_D: Pubkey = solana_pubkey::pubkey!("73V1Vhs3A8j8NrXKCbGmRek2dR92x9MkwUk4WEdYYRfQ");
-const PYTH_SOL_USD: Pubkey =
-    solana_pubkey::pubkey!("7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE");
+const PYTH_SOL_USD: Pubkey = solana_pubkey::pubkey!("7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE");
 const FEED_ID_HEX: &str = "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d";
 
 fn key(name: &str) -> Keypair {
@@ -48,7 +47,13 @@ fn metas(m: impl ToAccountMetas) -> Vec<AccountMeta> {
         .collect()
 }
 
-fn send(rpc: &RpcClient, label: &str, ix: Instruction, payer: &Keypair, signers: &[&Keypair]) -> Option<String> {
+fn send(
+    rpc: &RpcClient,
+    label: &str,
+    ix: Instruction,
+    payer: &Keypair,
+    signers: &[&Keypair],
+) -> Option<String> {
     let bh = rpc.get_latest_blockhash().expect("blockhash");
     let msg = Message::new(&[ix], Some(&payer.pubkey()));
     let mut tx = Transaction::new_unsigned(msg);
@@ -64,7 +69,8 @@ fn send(rpc: &RpcClient, label: &str, ix: Instruction, payer: &Keypair, signers:
             }
             Err(e) => {
                 let msg = e.to_string();
-                let retryable = msg.contains("429") || msg.contains("rate") || msg.contains("timed out");
+                let retryable =
+                    msg.contains("429") || msg.contains("rate") || msg.contains("timed out");
                 if !retryable || attempt == 5 {
                     println!("  {label:<28} FAILED: {e}");
                     return None;
@@ -107,13 +113,25 @@ fn main() {
     let (event_authority, _) = Pubkey::find_program_address(&[b"__event_authority"], &program);
     let strategy_id = markov_mandate::BOOK_ONE;
     // A fresh nonce each run, so re-running never collides with an existing PDA.
-    let nonce: u64 = std::env::var("NONCE").ok().and_then(|v| v.parse().ok()).unwrap_or(1);
+    let nonce: u64 = std::env::var("NONCE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1);
     let (mandate, _) = Pubkey::find_program_address(
-        &[Mandate::SEED, owner.pubkey().as_ref(), strategy_id.as_ref(), &nonce.to_le_bytes()],
+        &[
+            Mandate::SEED,
+            owner.pubkey().as_ref(),
+            strategy_id.as_ref(),
+            &nonce.to_le_bytes(),
+        ],
         &program,
     );
-    let (vault, _) = Pubkey::find_program_address(&[Mandate::VAULT_SEED, mandate.as_ref()], &program);
-    let owner_ata: Pubkey = std::env::var("OWNER_ATA").expect("OWNER_ATA").parse().unwrap();
+    let (vault, _) =
+        Pubkey::find_program_address(&[Mandate::VAULT_SEED, mandate.as_ref()], &program);
+    let owner_ata: Pubkey = std::env::var("OWNER_ATA")
+        .expect("OWNER_ATA")
+        .parse()
+        .unwrap();
 
     println!("program   {program}");
     println!("venue     {venue}");
@@ -150,7 +168,10 @@ fn main() {
                 admin: deployer.pubkey(),
                 registry,
             }),
-            data: markov_mandate::instruction::SetAdapters { adapters: vec![venue] }.data(),
+            data: markov_mandate::instruction::SetAdapters {
+                adapters: vec![venue],
+            }
+            .data(),
         },
         &deployer,
         &[&deployer],
@@ -166,8 +187,8 @@ fn main() {
         tokens: [Pubkey::default(); 4],
         tokens_len: 2,
         allowed_actions: action_bits::ALL,
-        per_tx_cap: 50_000_000,      // 50 USDC-d
-        daily_cap: 200_000_000,      // 200 USDC-d
+        per_tx_cap: 50_000_000, // 50 USDC-d
+        daily_cap: 200_000_000, // 200 USDC-d
         spend_per_call: 1_000_000,
         spend_daily: 5_000_000,
         max_slippage_bps: 50,
@@ -225,7 +246,10 @@ fn main() {
                 event_authority,
                 program,
             }),
-            data: markov_mandate::instruction::Fund { amount: 100_000_000 }.data(),
+            data: markov_mandate::instruction::Fund {
+                amount: 100_000_000,
+            }
+            .data(),
         },
         &owner,
         &[&owner],

@@ -11,9 +11,9 @@ mod harness;
 
 use anchor_lang::InstructionData;
 use harness::*;
-use solana_signer::Signer;
 use markov_mandate::state::MandateState;
 use markov_types::{ActionKind, BlockReason};
+use solana_signer::Signer;
 
 /// The invariant the whole product rests on: no state disables the exit.
 #[test]
@@ -102,7 +102,8 @@ fn emergency_cannot_unpause_or_withdraw() {
     assert_eq!(e.mandate_state().state, MandateState::Revoked);
     // And the owner still leaves.
     let owner = e.owner.insecure_clone();
-    e.withdraw(1_000, &owner).expect("owner withdraw after emergency revoke");
+    e.withdraw(1_000, &owner)
+        .expect("owner withdraw after emergency revoke");
     assert_eq!(e.vault_amount(), 0);
 }
 
@@ -121,7 +122,10 @@ fn amend_tighten_ok() {
     let m = e.mandate_state();
     assert_eq!(m.policy.per_tx_cap, 10);
     assert_eq!(m.policy.expiry_ts, NOW + 3_600);
-    assert_eq!(m.policy.allowed_actions, markov_mandate::state::action_bits::CLOSE);
+    assert_eq!(
+        m.policy.allowed_actions,
+        markov_mandate::state::action_bits::CLOSE
+    );
 }
 
 #[test]
@@ -155,7 +159,10 @@ fn amend_widen_rejected() {
     assert!(e.amend(p, &owner).is_err(), "a new venue was accepted");
     let mut p = policy(e.venue, e.mint, NOW + 86_400);
     p.allowed_actions = markov_mandate::state::action_bits::ALL | 1 << 15;
-    assert!(e.amend(p, &owner).is_err(), "an unknown action bit was accepted");
+    assert!(
+        e.amend(p, &owner).is_err(),
+        "an unknown action bit was accepted"
+    );
 }
 
 #[test]
@@ -169,7 +176,10 @@ fn amend_rejects_non_owner_and_revoked() {
     assert!(e.amend(p, &emergency).is_err());
     let owner = e.owner.insecure_clone();
     e.revoke(&owner).expect("revoke");
-    assert!(e.amend(p, &owner).is_err(), "amend accepted on a revoked mandate");
+    assert!(
+        e.amend(p, &owner).is_err(),
+        "amend accepted on a revoked mandate"
+    );
 }
 
 /// The most important implementation detail in the program: a refusal is a
@@ -192,18 +202,33 @@ fn refusal_emits_receipt_and_commits() {
     assert_eq!(r.operator, operator.pubkey());
     assert_eq!(r.strategy_id, markov_mandate::BOOK_ONE);
     assert!(!r.forced);
-    assert!(actions(&meta).is_empty(), "a refusal must not also emit an ActionReceipt");
+    assert!(
+        actions(&meta).is_empty(),
+        "a refusal must not also emit an ActionReceipt"
+    );
 
     // Committed: the sequence advanced and the counters did not.
     let m = e.mandate_state();
     assert_eq!(m.action_seq, 1, "the receipt's seq was not persisted");
-    assert_eq!(m.day_notional_used, 0, "a refused action must not spend the daily cap");
-    assert_eq!(e.vault_amount(), 1_000, "a refused action must not move tokens");
+    assert_eq!(
+        m.day_notional_used, 0,
+        "a refused action must not spend the daily cap"
+    );
+    assert_eq!(
+        e.vault_amount(),
+        1_000,
+        "a refused action must not move tokens"
+    );
 }
 
 #[test]
 fn every_refusal_reason_reaches_the_chain_with_its_gate_index() {
-    let cases: [(&str, fn(&mut Env) -> markov_mandate::gates::Intent, BlockReason, u8); 6] = [
+    let cases: [(
+        &str,
+        fn(&mut Env) -> markov_mandate::gates::Intent,
+        BlockReason,
+        u8,
+    ); 6] = [
         (
             "global halt",
             |e| {
@@ -233,7 +258,12 @@ fn every_refusal_reason_reaches_the_chain_with_its_gate_index() {
             BlockReason::Paused,
             2,
         ),
-        ("over tx cap", |_| intent(ActionKind::Open, 51, 4), BlockReason::OverTxCap, 8),
+        (
+            "over tx cap",
+            |_| intent(ActionKind::Open, 51, 4),
+            BlockReason::OverTxCap,
+            8,
+        ),
         (
             "over spend cap",
             |_| {
@@ -259,12 +289,18 @@ fn every_refusal_reason_reaches_the_chain_with_its_gate_index() {
         let mut e = Env::new(1_000);
         let it = drive(&mut e);
         let operator = e.operator.insecure_clone();
-        let meta = e.execute(it, &operator).unwrap_or_else(|err| panic!("{label}: {err:?}"));
+        let meta = e
+            .execute(it, &operator)
+            .unwrap_or_else(|err| panic!("{label}: {err:?}"));
         let rs = refusals(&meta);
         assert_eq!(rs.len(), 1, "{label}: expected one receipt");
         assert_eq!(rs[0].reason, reason, "{label}");
         assert_eq!(rs[0].gate_index, gate, "{label}");
-        assert_eq!(e.vault_amount(), 1_000, "{label}: tokens moved on a refusal");
+        assert_eq!(
+            e.vault_amount(),
+            1_000,
+            "{label}: tokens moved on a refusal"
+        );
     }
 }
 
@@ -280,7 +316,9 @@ fn stale_or_unbound_mark_is_refused() {
     acc.data = price_update_data(FEED_ID, MARK_PRICE_E6 as i64, NOW - 1_000, 1);
     e.svm.set_account(price, acc).unwrap();
     let operator = e.operator.insecure_clone();
-    let meta = e.execute(intent(ActionKind::Open, 10, 7), &operator).expect("commits");
+    let meta = e
+        .execute(intent(ActionKind::Open, 10, 7), &operator)
+        .expect("commits");
     let rs = refusals(&meta);
     assert_eq!(rs[0].reason, BlockReason::StaleOracle);
     assert_eq!(rs[0].gate_index, 12);
@@ -292,7 +330,9 @@ fn stale_or_unbound_mark_is_refused() {
     acc.data = price_update_data([0x11; 32], MARK_PRICE_E6 as i64, NOW - 10, 1);
     e.svm.set_account(price, acc).unwrap();
     let operator = e.operator.insecure_clone();
-    let meta = e.execute(intent(ActionKind::Open, 10, 8), &operator).expect("commits");
+    let meta = e
+        .execute(intent(ActionKind::Open, 10, 8), &operator)
+        .expect("commits");
     assert_eq!(refusals(&meta)[0].reason, BlockReason::StaleOracle);
 }
 
@@ -305,7 +345,12 @@ fn duplicate_intent_refused() {
     // First one is allowed: the ladder passes and the venue accepts.
     let meta = e.execute(it, &operator).expect("first execute");
     let allowed = actions(&meta);
-    assert_eq!(allowed.len(), 1, "expected an ActionReceipt: {:?}", meta.logs);
+    assert_eq!(
+        allowed.len(),
+        1,
+        "expected an ActionReceipt: {:?}",
+        meta.logs
+    );
     assert_eq!(allowed[0].notional, 10);
     assert_eq!(allowed[0].mark_price, MARK_PRICE_E6);
     let m = e.mandate_state();
@@ -369,7 +414,11 @@ fn revoke_then_next_attempt_refused() {
     let mut e = Env::new(1_000);
     let owner = e.owner.insecure_clone();
     let revoke_meta = e.revoke(&owner).expect("revoke");
-    assert_eq!(owner_actions(&revoke_meta).len(), 1, "revoke emitted no receipt");
+    assert_eq!(
+        owner_actions(&revoke_meta).len(),
+        1,
+        "revoke emitted no receipt"
+    );
 
     let operator = e.operator.insecure_clone();
     let refuse_meta = e
@@ -396,7 +445,9 @@ fn a_venue_outside_the_registry_is_refused_even_if_the_policy_allows_it() {
     let mut e = Env::new(1_000);
     e.set_adapters(vec![]); // policy still lists it; the registry no longer does
     let operator = e.operator.insecure_clone();
-    let meta = e.execute(intent(ActionKind::Open, 10, 40), &operator).expect("commits");
+    let meta = e
+        .execute(intent(ActionKind::Open, 10, 40), &operator)
+        .expect("commits");
     let rs = refusals(&meta);
     assert_eq!(rs[0].reason, BlockReason::ProgramNotAllowed);
     assert_eq!(rs[0].gate_index, 5);
@@ -433,5 +484,8 @@ fn close_mandate_needs_an_empty_vault_and_returns_rent() {
     assert!(close(&mut e, &owner).is_err(), "closed with a funded vault");
     e.withdraw(100, &owner).expect("withdraw");
     close(&mut e, &owner).expect("close");
-    assert!(e.svm.get_account(&e.mandate).is_none_or(|a| a.data.is_empty()));
+    assert!(e
+        .svm
+        .get_account(&e.mandate)
+        .is_none_or(|a| a.data.is_empty()));
 }

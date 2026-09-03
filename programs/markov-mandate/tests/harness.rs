@@ -88,7 +88,10 @@ pub fn price_update_data(feed_id: [u8; 32], price: i64, publish_time: i64, slot:
     d.extend_from_slice(&price.to_le_bytes()); // ema
     d.extend_from_slice(&1_400_000u64.to_le_bytes());
     d.extend_from_slice(&slot.to_le_bytes());
-    d.resize(pyth_solana_receiver_sdk::price_update::PriceUpdateV2::LEN, 0);
+    d.resize(
+        pyth_solana_receiver_sdk::price_update::PriceUpdateV2::LEN,
+        0,
+    );
     d
 }
 
@@ -128,12 +131,18 @@ impl Env {
         let venue = demo_perps::ID;
         svm.add_program(
             program,
-            include_bytes!(concat!(env!("CARGO_TARGET_TMPDIR"), "/../deploy/markov_mandate.so")),
+            include_bytes!(concat!(
+                env!("CARGO_TARGET_TMPDIR"),
+                "/../deploy/markov_mandate.so"
+            )),
         )
         .unwrap();
         svm.add_program(
             venue,
-            include_bytes!(concat!(env!("CARGO_TARGET_TMPDIR"), "/../deploy/demo_perps.so")),
+            include_bytes!(concat!(
+                env!("CARGO_TARGET_TMPDIR"),
+                "/../deploy/demo_perps.so"
+            )),
         )
         .unwrap();
         set_clock(&mut svm, NOW);
@@ -229,7 +238,11 @@ impl Env {
         env
     }
 
-    pub fn send(&mut self, ix: Instruction, signers: &[&Keypair]) -> litesvm::types::TransactionResult {
+    pub fn send(
+        &mut self,
+        ix: Instruction,
+        signers: &[&Keypair],
+    ) -> litesvm::types::TransactionResult {
         // Two identical instructions from the same signer on the same
         // blockhash hash to the same signature, which LiteSVM rejects as
         // AlreadyProcessed. A real cluster moves the blockhash on; here we do
@@ -241,7 +254,11 @@ impl Env {
         self.svm.send_transaction(tx)
     }
 
-    fn ix(&self, data: Vec<u8>, metas: Vec<anchor_lang::solana_program::instruction::AccountMeta>) -> Instruction {
+    fn ix(
+        &self,
+        data: Vec<u8>,
+        metas: Vec<anchor_lang::solana_program::instruction::AccountMeta>,
+    ) -> Instruction {
         Instruction {
             program_id: self.program,
             accounts: metas
@@ -343,7 +360,11 @@ impl Env {
         self.send(ix, &[&owner])
     }
 
-    pub fn owner_only(&mut self, data: Vec<u8>, signer: &Keypair) -> litesvm::types::TransactionResult {
+    pub fn owner_only(
+        &mut self,
+        data: Vec<u8>,
+        signer: &Keypair,
+    ) -> litesvm::types::TransactionResult {
         let ix = self.ix(
             data,
             markov_mandate::accounts::OwnerOnly {
@@ -439,10 +460,12 @@ impl Env {
         .to_account_metas(None);
         // The venue's own accounts ride as remaining accounts; the mandate PDA
         // is the signer the venue sees.
-        metas.push(anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-            self.mandate,
-            false,
-        ));
+        metas.push(
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                self.mandate,
+                false,
+            ),
+        );
         let ix = self.ix(
             markov_mandate::instruction::ExecuteVenueAction { intent }.data(),
             metas,
@@ -468,7 +491,11 @@ impl Env {
 
 use anchor_lang::AccountDeserialize;
 
-pub fn intent(action: markov_types::ActionKind, notional: u64, id: u8) -> markov_mandate::gates::Intent {
+pub fn intent(
+    action: markov_types::ActionKind,
+    notional: u64,
+    id: u8,
+) -> markov_mandate::gates::Intent {
     markov_mandate::gates::Intent {
         intent_id: [id; 32],
         action,
@@ -485,15 +512,21 @@ pub fn intent(action: markov_types::ActionKind, notional: u64, id: u8) -> markov
 /// Decode the `RefusalReceipt`s a transaction emitted, from the CPI-event
 /// instruction data in its inner instructions. This is the same path the
 /// indexer will use — the receipt is data, not a log line.
-pub fn refusals(meta: &litesvm::types::TransactionMetadata) -> Vec<markov_mandate::receipts::RefusalReceipt> {
+pub fn refusals(
+    meta: &litesvm::types::TransactionMetadata,
+) -> Vec<markov_mandate::receipts::RefusalReceipt> {
     event_of::<markov_mandate::receipts::RefusalReceipt>(meta)
 }
 
-pub fn actions(meta: &litesvm::types::TransactionMetadata) -> Vec<markov_mandate::receipts::ActionReceipt> {
+pub fn actions(
+    meta: &litesvm::types::TransactionMetadata,
+) -> Vec<markov_mandate::receipts::ActionReceipt> {
     event_of::<markov_mandate::receipts::ActionReceipt>(meta)
 }
 
-pub fn owner_actions(meta: &litesvm::types::TransactionMetadata) -> Vec<markov_mandate::receipts::OwnerAction> {
+pub fn owner_actions(
+    meta: &litesvm::types::TransactionMetadata,
+) -> Vec<markov_mandate::receipts::OwnerAction> {
     event_of::<markov_mandate::receipts::OwnerAction>(meta)
 }
 

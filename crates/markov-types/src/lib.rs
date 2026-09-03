@@ -12,7 +12,11 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "anchor",
-    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, anchor_lang::InitSpace)
+    derive(
+        anchor_lang::AnchorSerialize,
+        anchor_lang::AnchorDeserialize,
+        anchor_lang::InitSpace
+    )
 )]
 // The wire byte IS the explicit discriminant: 0-10 are exactly what the
 // predecessor emitted on devnet, so the encoding must not renumber them.
@@ -98,7 +102,11 @@ impl BlockReason {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(
     feature = "anchor",
-    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, anchor_lang::InitSpace)
+    derive(
+        anchor_lang::AnchorSerialize,
+        anchor_lang::AnchorDeserialize,
+        anchor_lang::InitSpace
+    )
 )]
 // The wire byte IS the explicit discriminant: 0-10 are exactly what the
 // predecessor emitted on devnet, so the encoding must not renumber them.
@@ -118,7 +126,11 @@ pub enum ActionKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(
     feature = "anchor",
-    derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, anchor_lang::InitSpace)
+    derive(
+        anchor_lang::AnchorSerialize,
+        anchor_lang::AnchorDeserialize,
+        anchor_lang::InitSpace
+    )
 )]
 // The wire byte IS the explicit discriminant: 0-10 are exactly what the
 // predecessor emitted on devnet, so the encoding must not renumber them.

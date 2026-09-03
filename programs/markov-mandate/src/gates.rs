@@ -165,9 +165,8 @@ pub fn gate_slippage(policy: &Policy, intent: &Intent, mark: Option<MarkInput>) 
             return refuse(BlockReason::SlippageExceeded, 11);
         }
         let diff = intent.limit_price.abs_diff(mark.price_e6) as u128;
-        let bound = (mark.price_e6 as u128)
-            .saturating_mul(intent.max_slippage_bps as u128)
-            / 10_000u128;
+        let bound =
+            (mark.price_e6 as u128).saturating_mul(intent.max_slippage_bps as u128) / 10_000u128;
         if diff > bound {
             return refuse(BlockReason::SlippageExceeded, 11);
         }
@@ -317,8 +316,16 @@ mod tests {
         type Mutate = fn(&mut Registry, &mut Mandate, &mut Intent);
         let cases: [(Mutate, BlockReason, u8); 13] = [
             (|r, _, _| r.global_halt = true, BlockReason::GlobalHalt, 1),
-            (|_, m, _| m.state = MandateState::Paused, BlockReason::Paused, 2),
-            (|_, m, _| m.state = MandateState::Revoked, BlockReason::Revoked, 2),
+            (
+                |_, m, _| m.state = MandateState::Paused,
+                BlockReason::Paused,
+                2,
+            ),
+            (
+                |_, m, _| m.state = MandateState::Revoked,
+                BlockReason::Revoked,
+                2,
+            ),
             (|_, m, _| m.policy.expiry_ts = NOW, BlockReason::Expired, 2),
             (|_, m, _| m.operator = pk(99), BlockReason::Unauthorized, 3),
             (
@@ -329,13 +336,36 @@ mod tests {
                 BlockReason::DuplicateIntent,
                 4,
             ),
-            (|_, m, _| m.policy.venues[0] = pk(98), BlockReason::ProgramNotAllowed, 5),
-            (|_, m, _| m.policy.tokens[0] = pk(97), BlockReason::TokenNotAllowed, 6),
-            (|_, m, _| m.policy.allowed_actions = action_bits::CLOSE, BlockReason::ActionNotAllowed, 7),
+            (
+                |_, m, _| m.policy.venues[0] = pk(98),
+                BlockReason::ProgramNotAllowed,
+                5,
+            ),
+            (
+                |_, m, _| m.policy.tokens[0] = pk(97),
+                BlockReason::TokenNotAllowed,
+                6,
+            ),
+            (
+                |_, m, _| m.policy.allowed_actions = action_bits::CLOSE,
+                BlockReason::ActionNotAllowed,
+                7,
+            ),
             (|_, _, i| i.notional = 51, BlockReason::OverTxCap, 8),
-            (|_, m, i| { m.day_notional_used = 195; i.notional = 6; }, BlockReason::OverDailyCap, 9),
+            (
+                |_, m, i| {
+                    m.day_notional_used = 195;
+                    i.notional = 6;
+                },
+                BlockReason::OverDailyCap,
+                9,
+            ),
             (|_, _, i| i.spend = 6, BlockReason::OverSpendCap, 10),
-            (|_, _, i| i.max_slippage_bps = 51, BlockReason::SlippageExceeded, 11),
+            (
+                |_, _, i| i.max_slippage_bps = 51,
+                BlockReason::SlippageExceeded,
+                11,
+            ),
         ];
         for (i, (mutate, reason, gate)) in cases.iter().enumerate() {
             let (mut r, mut m, mut it) = (registry(), mandate(), intent());
@@ -343,7 +373,10 @@ mod tests {
             let got = run(&r, &m, &it, MARK);
             assert_eq!(
                 got,
-                Some(Refusal { reason: *reason, gate_index: *gate }),
+                Some(Refusal {
+                    reason: *reason,
+                    gate_index: *gate
+                }),
                 "case {i}: expected {reason:?} at gate {gate}, got {got:?}"
             );
         }
@@ -357,7 +390,10 @@ mod tests {
         i.notional = 10_000;
         assert_eq!(
             run(&r, &m, &i, MARK),
-            Some(Refusal { reason: BlockReason::Revoked, gate_index: 2 })
+            Some(Refusal {
+                reason: BlockReason::Revoked,
+                gate_index: 2
+            })
         );
     }
 
@@ -367,7 +403,10 @@ mod tests {
         r.adapters_len = 0;
         assert_eq!(
             run(&r, &m, &i, MARK),
-            Some(Refusal { reason: BlockReason::ProgramNotAllowed, gate_index: 5 })
+            Some(Refusal {
+                reason: BlockReason::ProgramNotAllowed,
+                gate_index: 5
+            })
         );
     }
 
@@ -375,7 +414,10 @@ mod tests {
     fn an_unreadable_mark_is_stale_oracle_at_gate_12() {
         assert_eq!(
             run(&registry(), &mandate(), &intent(), None),
-            Some(Refusal { reason: BlockReason::StaleOracle, gate_index: 12 })
+            Some(Refusal {
+                reason: BlockReason::StaleOracle,
+                gate_index: 12
+            })
         );
     }
 
@@ -386,7 +428,10 @@ mod tests {
         i.limit_price = 100_600_000;
         assert_eq!(
             run(&r, &m, &i, MARK),
-            Some(Refusal { reason: BlockReason::SlippageExceeded, gate_index: 11 })
+            Some(Refusal {
+                reason: BlockReason::SlippageExceeded,
+                gate_index: 11
+            })
         );
         i.limit_price = 100_400_000;
         assert_eq!(run(&r, &m, &i, MARK), None);
@@ -398,7 +443,10 @@ mod tests {
         i.action = ActionKind::Skip;
         assert_eq!(
             run(&r, &m, &i, MARK),
-            Some(Refusal { reason: BlockReason::ActionNotAllowed, gate_index: 7 })
+            Some(Refusal {
+                reason: BlockReason::ActionNotAllowed,
+                gate_index: 7
+            })
         );
     }
 
@@ -410,7 +458,10 @@ mod tests {
         i.notional = 1;
         assert_eq!(
             run(&r, &m, &i, MARK),
-            Some(Refusal { reason: BlockReason::OverDailyCap, gate_index: 9 })
+            Some(Refusal {
+                reason: BlockReason::OverDailyCap,
+                gate_index: 9
+            })
         );
         let (r, mut m, mut i) = (registry(), mandate(), intent());
         m.day_spend_used = u64::MAX;
@@ -419,7 +470,10 @@ mod tests {
         i.spend = 1;
         assert_eq!(
             run(&r, &m, &i, MARK),
-            Some(Refusal { reason: BlockReason::OverSpendDailyCap, gate_index: 10 })
+            Some(Refusal {
+                reason: BlockReason::OverSpendDailyCap,
+                gate_index: 10
+            })
         );
     }
 
@@ -440,7 +494,10 @@ mod tests {
         i.notional = 1;
         assert_eq!(
             run(&registry(), &m, &i, MARK),
-            Some(Refusal { reason: BlockReason::OverDailyCap, gate_index: 9 })
+            Some(Refusal {
+                reason: BlockReason::OverDailyCap,
+                gate_index: 9
+            })
         );
         // Next UTC day: counters and the replay ring reset.
         m.rollover(NOW + 86_400);
@@ -461,6 +518,9 @@ mod tests {
         }
         m.remember_intent([99; 32]);
         assert!(m.has_recent_intent(&[99; 32]));
-        assert!(!m.has_recent_intent(&[0; 32]), "ring did not evict the oldest");
+        assert!(
+            !m.has_recent_intent(&[0; 32]),
+            "ring did not evict the oldest"
+        );
     }
 }

@@ -85,13 +85,22 @@ impl Policy {
     /// only shorten. A widening amendment is a hard error, not a no-op.
     pub fn assert_tightens(&self, new: &Policy) -> Result<()> {
         new.validate()?;
-        require!(new.per_tx_cap <= self.per_tx_cap, MandateError::PolicyNotTightened);
-        require!(new.daily_cap <= self.daily_cap, MandateError::PolicyNotTightened);
+        require!(
+            new.per_tx_cap <= self.per_tx_cap,
+            MandateError::PolicyNotTightened
+        );
+        require!(
+            new.daily_cap <= self.daily_cap,
+            MandateError::PolicyNotTightened
+        );
         require!(
             new.spend_per_call <= self.spend_per_call,
             MandateError::PolicyNotTightened
         );
-        require!(new.spend_daily <= self.spend_daily, MandateError::PolicyNotTightened);
+        require!(
+            new.spend_daily <= self.spend_daily,
+            MandateError::PolicyNotTightened
+        );
         require!(
             new.max_slippage_bps <= self.max_slippage_bps,
             MandateError::PolicyNotTightened
@@ -100,16 +109,25 @@ impl Policy {
             new.max_mark_age_secs <= self.max_mark_age_secs,
             MandateError::PolicyNotTightened
         );
-        require!(new.expiry_ts <= self.expiry_ts, MandateError::PolicyNotTightened);
+        require!(
+            new.expiry_ts <= self.expiry_ts,
+            MandateError::PolicyNotTightened
+        );
         require!(
             new.allowed_actions & !self.allowed_actions == 0,
             MandateError::PolicyNotTightened
         );
         for i in 0..new.venues_len.min(MAX_VENUES as u8) as usize {
-            require!(self.venue_allowed(&new.venues[i]), MandateError::PolicyNotTightened);
+            require!(
+                self.venue_allowed(&new.venues[i]),
+                MandateError::PolicyNotTightened
+            );
         }
         for i in 0..new.tokens_len.min(MAX_TOKENS as u8) as usize {
-            require!(self.token_allowed(&new.tokens[i]), MandateError::PolicyNotTightened);
+            require!(
+                self.token_allowed(&new.tokens[i]),
+                MandateError::PolicyNotTightened
+            );
         }
         Ok(())
     }

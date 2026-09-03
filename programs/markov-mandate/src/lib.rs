@@ -79,10 +79,7 @@ pub mod markov_mandate {
         Ok(())
     }
 
-    pub fn create_mandate(
-        ctx: Context<CreateMandate>,
-        args: CreateMandateArgs,
-    ) -> Result<()> {
+    pub fn create_mandate(ctx: Context<CreateMandate>, args: CreateMandateArgs) -> Result<()> {
         args.policy.validate()?;
         let now = Clock::get()?.unix_timestamp;
         require!(args.policy.expiry_ts > now, MandateError::InvalidPolicy);
@@ -132,7 +129,10 @@ pub mod markov_mandate {
     pub fn fund(ctx: Context<Fund>, amount: u64) -> Result<()> {
         require!(amount > 0, MandateError::InvalidAmount);
         let m = &ctx.accounts.mandate;
-        require!(m.state != MandateState::Revoked, MandateError::AlreadyRevoked);
+        require!(
+            m.state != MandateState::Revoked,
+            MandateError::AlreadyRevoked
+        );
         require!(
             m.policy.token_allowed(&ctx.accounts.mint.key()),
             MandateError::WrongMint
@@ -164,7 +164,10 @@ pub mod markov_mandate {
     /// so an owner can never be told "amended" when nothing narrowed.
     pub fn amend_policy(ctx: Context<OwnerOnly>, new_policy: Policy) -> Result<()> {
         let m = &mut ctx.accounts.mandate;
-        require!(m.state != MandateState::Revoked, MandateError::AlreadyRevoked);
+        require!(
+            m.state != MandateState::Revoked,
+            MandateError::AlreadyRevoked
+        );
         m.policy.assert_tightens(&new_policy)?;
         // Rolling counters are the mandate's, not the policy's, so they survive.
         m.policy = new_policy;
@@ -227,7 +230,10 @@ pub mod markov_mandate {
             m.is_owner(&caller) || m.is_emergency(&caller),
             MandateError::NotOwnerOrEmergency
         );
-        require!(m.state != MandateState::Revoked, MandateError::AlreadyRevoked);
+        require!(
+            m.state != MandateState::Revoked,
+            MandateError::AlreadyRevoked
+        );
         m.state = MandateState::Revoked;
         let clock = Clock::get()?;
         emit_cpi!(owner_action(

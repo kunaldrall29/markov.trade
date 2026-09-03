@@ -185,7 +185,7 @@ One trait, two consumers: the program CPIs into it, and the off-chain `markov-ve
 
 **Rules that make this a real seam, not a stub:**
 - Every write takes the **mandate PDA as the authority signer** — the operator key never signs to the venue directly.
-- Every write returns a `Fill { price, notional, fee }` the program can post-check.
+- Every write **reports what happened**: a `Fill { price, notional, fee }` the program can post-check, or an accepted request carrying no price (`VenueOutcome::Requested`). It may never invent a fill — see ADR-007. `demo_perps` is synchronous and only ever fills.
 - Errors are a fixed set: `MarketUnknown`, `StaleMark`, `SlippageExceeded`, `InsufficientCollateral`, `PositionLimit`, `VenuePaused`. A real venue's error space maps onto these; anything unmapped becomes `VenueRejected`.
 - No method may take a `&str` price feed name or a client-supplied price. Marks come from an account.
 
