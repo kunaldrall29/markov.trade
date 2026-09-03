@@ -8,11 +8,7 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-mod config;
-mod core;
-mod paper;
-mod sidecar;
-mod tick;
+use book_one::{config, core, paper, tick};
 
 use std::process::ExitCode;
 use std::time::Duration;
@@ -82,6 +78,9 @@ async fn run(cfg: config::Config) -> anyhow::Result<()> {
     // across a restart so two processes never write ticks seconds apart.
     let mut last_day = Utc::now().date_naive();
     let today_log = store.read_ticks(last_day)?;
+    // Shadow mode holds no position, so this only ever carries the previous
+    // tick's proposal — which is what hysteresis needs.
+    let mut book = core::BookState::default();
     let mut n: u64 = today_log.ticks.len() as u64;
     if let Some(last_ts) = today_log.ticks.iter().map(|t| t.ts_unix).max() {
         let since = Utc::now().timestamp().saturating_sub(last_ts);
@@ -125,7 +124,7 @@ async fn run(cfg: config::Config) -> anyhow::Result<()> {
         tokio::time::sleep(Duration::from_millis(jitter_ms)).await;
 
         n += 1;
-        let record = tick::run_tick(&cfg, &mut source, n).await;
+        let record = tick::run_tick(&cfg, &mut source, &mut book, n).await;
         info!(
             tick_id = %record.tick_id,
             slot = record.slot,

@@ -7,6 +7,10 @@ license = "MIT"
 description = "The house agent: scheduler, sidecar stub, core, guard, submitter, redteam, paper (VENUE=devnet | shadow)."
 publish = false
 
+[lib]
+name = "book_one"
+path = "src/lib.rs"
+
 [[bin]]
 name = "book-one"
 path = "src/main.rs"

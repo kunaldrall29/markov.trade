@@ -35,6 +35,21 @@ pub struct Config {
 }
 
 pub const TICK_FLOOR_SECS: u64 = 60;
+
+/// The settlement mint has 6 decimals, so one dollar is 1e6 base units. Every
+/// cap below is quoted in dollars in the pack and in base units here; the
+/// conversion lives in one place so no surface has to guess which it reads.
+pub const E6: u64 = 1_000_000;
+
+/// Gate B's policy, from `docs/11-AGENT-SPEC.md` §3 and P06's pre-flight:
+/// per-trade $50, daily $200, delta band ±$20, gross ceiling $100, 50 bps.
+pub const GATE_B_PER_TX_CAP: u64 = 50 * E6;
+pub const GATE_B_DAILY_CAP: u64 = 200 * E6;
+pub const GATE_B_DELTA_BAND: u128 = 20 * E6 as u128;
+pub const GATE_B_MAX_GROSS: u128 = 100 * E6 as u128;
+pub const GATE_B_MAX_SLIPPAGE_BPS: u16 = 50;
+/// Stop for the day once equity is 5% below the session's start.
+pub const GATE_B_DAILY_LOSS_BPS: u16 = 500;
 pub const DEFAULT_PUBLIC_DEVNET_RPC: &str = "https://api.devnet.solana.com";
 pub const DEFAULT_PYTH_ACCOUNT: &str = "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE";
 pub const DEFAULT_SOL_USD_FEED: &str =
@@ -93,35 +108,38 @@ impl Config {
             per_tx_cap: env("PER_TX_CAP")
                 .map(|v| v.parse())
                 .transpose()?
-                .unwrap_or(50),
+                .unwrap_or(GATE_B_PER_TX_CAP),
             daily_cap: env("DAILY_CAP")
                 .map(|v| v.parse())
                 .transpose()?
-                .unwrap_or(200),
+                .unwrap_or(GATE_B_DAILY_CAP),
+            // Gate B's venue takes no token custody, so an action spends
+            // nothing; the cap exists so a custody venue cannot arrive later
+            // and find it unset.
             spend_cap: env("SPEND_CAP")
                 .map(|v| v.parse())
                 .transpose()?
-                .unwrap_or(50),
+                .unwrap_or(GATE_B_PER_TX_CAP),
             spend_daily_cap: env("SPEND_DAILY_CAP")
                 .map(|v| v.parse())
                 .transpose()?
-                .unwrap_or(200),
+                .unwrap_or(GATE_B_DAILY_CAP),
             max_slippage_bps: env("MAX_SLIPPAGE_BPS")
                 .map(|v| v.parse())
                 .transpose()?
-                .unwrap_or(50),
+                .unwrap_or(GATE_B_MAX_SLIPPAGE_BPS),
             delta_band: env("DELTA_BAND")
                 .map(|v| v.parse())
                 .transpose()?
-                .unwrap_or(200),
+                .unwrap_or(GATE_B_DELTA_BAND),
             max_gross: env("MAX_GROSS")
                 .map(|v| v.parse())
                 .transpose()?
-                .unwrap_or(400),
+                .unwrap_or(GATE_B_MAX_GROSS),
             daily_loss_bps: env("DAILY_LOSS_BPS")
                 .map(|v| v.parse())
                 .transpose()?
-                .unwrap_or(500),
+                .unwrap_or(GATE_B_DAILY_LOSS_BPS),
             paper_dir: PathBuf::from(env("PAPER_DIR").unwrap_or_else(|| "paper".to_string())),
             paper_start_date,
             max_ticks: env("MAX_TICKS").map(|v| v.parse()).transpose()?,

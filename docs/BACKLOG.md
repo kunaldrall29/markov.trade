@@ -2,6 +2,14 @@
 
 Things noticed and deliberately not done, with one line of why. Each entry says what would have to be true to start. Items move out only via a prompt that owns them.
 
+## Noticed in P05/P06 (2026-09-03)
+
+| Item | Why not now | To start |
+|---|---|---|
+| **`docs/11` §3 hysteresis does not prevent the churn it is written to prevent.** The rule is "the same action in the previous tick"; rules 4 (delta band) and 6 (fill in chop) *alternate*, so it never fires. Measured by `crates/book-one/tests/replay.rs` with the funding stub forced on: **40.7% Skip** over 2,000 ticks, against 100% as Gate B ships. Broadening it to "any action after a recent action" swaps this for the opposite failure — the book locks up permanently once it acts, because the threshold is absolute (a quarter of a clip) while the drift is proportional to position size | unreachable in Gate B: `funding_favourable` is a stub constant `false`, so rule 6 never fires and the core never adds exposure. Redesigning a rule on the strength of a hypothetical is how specs rot | the first venue that reports real funding, i.e. Gate C. Needs a rule that scales with position size, or a minimum holding period |
+| The Gate B core **cannot open a position at all** — every path that adds exposure is behind `funding_favourable_stub: false`. A book that flattens on a halt stays flat for the rest of the session. Any surface showing the tape must not read this as a strategy choosing not to trade | it is the honest state of this build | a real funding signal (Gate C), or an explicit Gate B decision to seed a position by hand |
+| `BookState` is rebuilt from nothing at process start, so hysteresis has no history across a restart and the first tick after one can act immediately | shadow mode holds no position, so there is nothing to churn | P07 owns the runtime's state; persist it with the day counters |
+
 ## Noticed in Session 0 (2026-09-01)
 
 | Item | Why not now | To start |

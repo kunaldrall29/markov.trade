@@ -2,11 +2,13 @@
 
 use chrono::{DateTime, Utc};
 use markov_guard::{evaluate, ActionKind, GuardState, MandateState, PolicyView, Verdict};
+
+use crate::core::BookState;
 use markov_marks::{MarkError, MarkSource};
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
-use crate::sidecar::{RegimeSource, StubSidecar};
+use crate::sidecar::{Features, RegimeSource, StubSidecar};
 
 /// One row per tick, including the boring ones. This is the paper file's
 /// only input and it is never edited after being written.
@@ -33,33 +35,24 @@ pub struct TickRecord {
     pub error: Option<String>,
 }
 
-pub async fn run_tick<S: MarkSource>(cfg: &Config, source: &mut S, n: u64) -> TickRecord {
+pub async fn run_tick<S: MarkSource>(
+    cfg: &Config,
+    source: &mut S,
+    book: &mut BookState,
+    n: u64,
+) -> TickRecord {
     let t0 = std::time::Instant::now();
     let mark = source.get().await;
     // `now` is taken after the fetch so a mark published during the RPC round
     // trip cannot show a negative age.
     let now: DateTime<Utc> = Utc::now();
-    let feats = StubSidecar.features();
-    let intent = crate::core::propose(&feats);
-    // Shadow mode holds no mandate and no position, so the exposure, the
-    // counters and the equity are all genuinely zero — not unknown, and not
-    // defaulted to make a rule pass. The guard's daily-loss rule does not fire
-    // on a zero session-start equity, which is the correct behaviour for a book
-    // that has never had any: the caps above are what bound it.
-    let state = GuardState {
-        now_unix: now.timestamp(),
-        slot: mark.as_ref().ok().map(|m| m.observed_slot).unwrap_or(0),
-        state: MandateState::Active,
-        mark_e6: mark.as_ref().ok().and_then(|m| m.price_e6()),
-        mark_publish_time: mark.as_ref().ok().map(|m| m.publish_time),
-        net_delta: 0,
-        gross: 0,
-        vault_balance: 0,
-        day_notional_used: 0,
-        day_spend_used: 0,
-        session_start_equity: 0,
-        equity: 0,
-    };
+    let m = mark.as_ref().ok();
+    let feats = Features::new(
+        StubSidecar.features(),
+        m.and_then(|m| m.price_e6()),
+        m.map(|m| m.age_secs(now.timestamp())),
+        m.map(|m| m.age_slots()),
+    );
     let policy = PolicyView {
         max_mark_age_secs: cfg.max_mark_age_secs,
         allowed_actions: PolicyView::actions_mask(&[
@@ -77,6 +70,26 @@ pub async fn run_tick<S: MarkSource>(cfg: &Config, source: &mut S, n: u64) -> Ti
         delta_band: cfg.delta_band,
         max_gross: cfg.max_gross,
         daily_loss_bps: cfg.daily_loss_bps,
+    };
+    let intent = crate::core::propose(book, &feats, &policy);
+    // Shadow mode holds no mandate and no position, so the exposure, the
+    // counters and the equity are all genuinely zero — not unknown, and not
+    // defaulted to make a rule pass. The guard's daily-loss rule does not fire
+    // on a zero session-start equity, which is the correct behaviour for a book
+    // that has never had any: the caps above are what bound it.
+    let state = GuardState {
+        now_unix: now.timestamp(),
+        slot: m.map(|m| m.observed_slot).unwrap_or(0),
+        state: MandateState::Active,
+        mark_e6: feats.mark_e6,
+        mark_publish_time: m.map(|m| m.publish_time),
+        net_delta: book.net_delta,
+        gross: book.gross,
+        vault_balance: 0,
+        day_notional_used: 0,
+        day_spend_used: 0,
+        session_start_equity: 0,
+        equity: 0,
     };
     let verdict = evaluate(&intent, &state, &policy);
     let (verdict_name, reason, enforcement) = match verdict {
@@ -102,7 +115,12 @@ pub async fn run_tick<S: MarkSource>(cfg: &Config, source: &mut S, n: u64) -> Ti
         Err(e @ MarkError::Rpc(_)) => Some(format!("rpc: {e}")),
         Err(e) => Some(e.to_string()),
     };
-    let m = mark.as_ref().ok();
+    // Shadow mode submits nothing, so the book's exposure never changes. What
+    // *does* carry across ticks is the previous tick's proposal, which is what
+    // hysteresis compares against.
+    book.last_action = Some(intent.action);
+    book.last_net_delta = book.net_delta;
+
     TickRecord {
         tick_id: format!("{}-{n:06}", now.format("%Y%m%dT%H%M%SZ")),
         ts_unix: now.timestamp(),
