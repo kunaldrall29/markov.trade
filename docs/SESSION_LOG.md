@@ -26,6 +26,24 @@ One `##` per session, newest first. Facts, not narrative. What was verified, how
 - **102 tests green**, 0 failures; fmt, clippy `-D warnings` (CI's exact command), guard purity, guard ban list and the key scan all clean.
 - **Not done:** P06 and P07.
 
+## 2026-09-03 (S2, later) — P07: the agent acts, and four bugs it found by acting
+
+- **B4, B5 and B7 are on devnet.** Mandate `2ivTE7hw…`, three ticks:
+  - `SIG-ACT` `4zbk8Uy7…` — the agent's own reduce. The book was 40 USDC-d long, outside its ±20 delta band; the core's rule 4 cut it, the venue filled **25 at 104.724049** (fee 0.025), position 40 → 15.
+  - `SIG-CAP` `2dnmWG1r…` — `OverTxCap`, forced, from the 6-hourly probe at `per_tx_cap + 1`.
+  - `SIG-SLIP-OR-SPEND` `CSqi4m2w…` — `SlippageExceeded`, forced, one basis point past the bound.
+- **The position was seeded by hand, and the tape says so.** The Gate B core cannot open: every path that adds exposure is behind `funding_favourable`, a stub constant `false`. So the book was seeded with one long by a labelled setup step (`SEED open (not an agent decision)`), and the agent's contribution is the reduce. Presenting the seed as an agent decision would be the exact kind of claim this project exists not to make.
+- **Four bugs, each found by running it, each of which would have made the tape wrong rather than broken.**
+  1. The loop read the venue position *after* the core proposed, so every first tick decided against a book of zero.
+  2. The guard mirrored the policy from the environment while the program enforced the one on chain. They agreed only because the boot check makes them agree — a coincidence, not a design.
+  3. Every action came back `VenueRejected` / `StaleMark`: the venue enforces its own freshness and nothing refreshed it. `post_mark_from_pyth` is now bundled into the same transaction as the action. Measured before the fix: `27V1Kwrs…`.
+  4. `guard_divergence_total` counted `VenueRejected` as a divergence. It is not — the guard has no view of the venue's internals and never claimed one. A false page teaches people to ignore the one alarm that means the tape cannot be trusted.
+- **The tape has real numbers now.** The tick row carries the position and its marked PnL read from the venue, so the paper file computes hedge error (mean 21.25, max 40.00) and marked return (+0.329872, marked, unrealised). The renderer still refuses a day that proposed something and recorded no book; what changed is that the success path is reachable.
+- **The agent cannot own anything, and that is checked.** `cannot_build_owner_instructions` greps the crate's own source for the owner verbs in both spellings; the process refuses to boot if it can read the emergency, owner, deployer or upgrade key. `HALT` stops submissions but not ticks — a halted agent must not look like a crashed one. `MAX_ACTIONS_PER_HOUR` latches off rather than throttling.
+- **Hosted, but not armed.** Railway service `book-one-devnet` with a volume, `/health` (503 after three missed ticks) and an ALWAYS restart policy, deployed in **shadow** mode. `OPERATOR_KEY_JSON` is Kunal's to set: moving a private key into a hosted service is his decision, and the sandbox blocked me from reading the file, which was the right answer.
+- **B3 is not met** and the row says so: it needs 24 hours of ≥60 s ticks, and the clock starts when the hosted service runs in devnet mode.
+- **133 tests green**; fmt, clippy `-D warnings`, guard purity, key scan clean.
+
 ## 2026-09-02 (P04) — the mock venue, and a bug P02 had shipped
 
 - **P04 (B11 green).** `demo_perps` is a real venue now: `Market`, `MarkAccount`, `Position` PDAs; deterministic fills at `mark ± fee_bps` where a taker never gets a better price than the mark; its own on-chain freshness gate independent of the mandate's; funding at a published devnet constant charged to the long; and `post_mark_from_pyth`, which relays the Pyth account and records **`source: Pyth`** on chain so a page can state where the price came from. Zero token custody, checked three ways by `scripts/no-token-custody.sh`.
