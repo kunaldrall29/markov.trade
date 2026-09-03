@@ -2,6 +2,17 @@
 
 Things noticed and deliberately not done, with one line of why. Each entry says what would have to be true to start. Items move out only via a prompt that owns them.
 
+## Noticed in P07 (2026-09-03)
+
+| Item | Why not now | To start |
+|---|---|---|
+| **B3 needs the operator key on Railway.** `book-one-devnet` is deployed, healthy and ticking, but in shadow mode: `OPERATOR_KEY_JSON` is unset. Moving a private key into a hosted service is Kunal's decision, and the sandbox blocked me from reading the file — correctly | not mine to do | Kunal sets `OPERATOR_KEY_JSON` and `VENUE=devnet`; the 24-hour clock starts then |
+| `REDTEAM_WRONG_MARK_ACCOUNT` points at a **third party's** `PriceUpdateV2` (`1121JSUg…`), which could be closed at any time. A permanent sponsored-feed account would be stable, but the receiver's sponsored-feed PDA scheme did not reproduce the known SOL/USD account from `[shard_le, feed_id]` for shards 0–3, so the derivation is unknown | the probe logs and skips if the account vanishes; it does not fake a result | derive or look up a permanent sponsored-feed account, or post one of our own |
+| The §6 `Revoked` probe has never fired: it is state-triggered and the Gate B mandate is Active | revoking is an owner action, and revoking the mandate the agent is running against would end the run | the B6/`SIG-REV` step of the Gate B tape, which revokes deliberately |
+| The agent holds **no day-counter or hysteresis state across a restart** — `BookState` and `LastRun` are rebuilt empty, so the first tick after a restart can act immediately and every red-team probe is due again | the counters that matter (`day_notional_used`, `day_spend_used`) are read from the chain, so nothing unsafe follows; only the cadence is affected | persist `LastRun` on the volume next to the tick log |
+| `book-one-devnet` writes a **second** paper tape on its own volume, starting 2026-09-03, while the shadow runner's tape starts 2026-09-02. Two tapes for one book is confusing on a public page | they are genuinely different runners; merging them would need a story about which is canonical | P10 serves `/v1/paper`; decide there which tape is the book's |
+| The `SEED` step in `gate_b_setup.rs` submits an `Open` through the operator key, which is the agent's own instruction. It is labelled everywhere, but a reader of the chain alone cannot tell it from an agent decision — only `forced` distinguishes red-team probes, not seeds | the label is in the runbook, FACTS and the session log | a `seed` flag on the receipt, or a distinct `strategy_id`, before the B15 tape |
+
 ## Noticed in P05/P06 (2026-09-03)
 
 | Item | Why not now | To start |
