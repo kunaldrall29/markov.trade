@@ -431,6 +431,11 @@ mod tests {
             verdict: verdict.to_string(),
             reason: reason.map(str::to_string),
             reason_enforcement: reason.map(|_| "on_chain".to_string()),
+            signature: None,
+            forced: false,
+            withheld: None,
+            onchain_reason: None,
+            redteam_probe: None,
             latency_ms: 5,
             error: None,
         }

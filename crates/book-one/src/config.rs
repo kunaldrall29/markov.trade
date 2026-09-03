@@ -29,6 +29,22 @@ pub struct Config {
     pub max_gross: u128,
     /// 500 = stop for the day once equity is 5% below the session's start.
     pub daily_loss_bps: u16,
+    /// Devnet mode only; ignored in shadow.
+    pub program_id: String,
+    pub mandate: String,
+    pub venue_program: String,
+    pub market_id: [u8; 16],
+    pub operator_key_path: String,
+    /// The red team's `StaleOracle` probe needs a valid Pyth price update
+    /// account that is **not** this mandate's. Absent means the probe is
+    /// skipped and says so, rather than being faked.
+    pub redteam_wrong_mark_account: Option<String>,
+    pub max_actions_per_hour: u32,
+    pub halt_env: String,
+    pub halt_file: PathBuf,
+    /// Health and metrics. Railway sets `PORT`.
+    pub port: u16,
+    pub submit_attempts: u32,
     pub paper_dir: PathBuf,
     pub paper_start_date: Option<chrono::NaiveDate>,
     pub max_ticks: Option<u64>,
@@ -50,6 +66,13 @@ pub const GATE_B_MAX_GROSS: u128 = 100 * E6 as u128;
 pub const GATE_B_MAX_SLIPPAGE_BPS: u16 = 50;
 /// Stop for the day once equity is 5% below the session's start.
 pub const GATE_B_DAILY_LOSS_BPS: u16 = 500;
+
+/// The deployed Gate B programs (FACTS `PROGRAM_ID`, `DEMO_PERPS_ID`).
+pub const DEFAULT_PROGRAM_ID: &str = "25CdYaZeB18QvUR7cTyZPgTZPNREb7t6xL8zmk1eXAU6";
+pub const DEFAULT_VENUE_PROGRAM: &str = "3Zcd8XsFWBTVku5GxQjwEBC7sLrJhF8vadyTnTr56hxB";
+/// Six actions an hour is roughly one every ten minutes against a 60-second
+/// tick. A book that wants more than that is not the book this is.
+pub const DEFAULT_MAX_ACTIONS_PER_HOUR: u32 = 6;
 pub const DEFAULT_PUBLIC_DEVNET_RPC: &str = "https://api.devnet.solana.com";
 pub const DEFAULT_PYTH_ACCOUNT: &str = "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE";
 pub const DEFAULT_SOL_USD_FEED: &str =
@@ -94,6 +117,18 @@ impl Config {
         if venue == Venue::Shadow && paper_start_date.is_none() {
             anyhow::bail!("PAPER_START_DATE is required in shadow mode (docs/FACTS.md PAPER_START_DATE, never edited); without it missing days could be silently omitted");
         }
+        let paper_dir_str = env("PAPER_DIR").unwrap_or_else(|| "paper".to_string());
+        // A fixed-width market id, padded with zeroes exactly as the program
+        // stores it. Longer than 16 bytes is a configuration error, not a
+        // truncation: silently trading a different market is the worst
+        // possible way to be wrong.
+        let market_name = env("MARKET_ID").unwrap_or_else(|| "SOL-PERP".to_string());
+        if market_name.len() > 16 {
+            anyhow::bail!("MARKET_ID={market_name} is longer than 16 bytes");
+        }
+        let mut market_id = [0u8; 16];
+        market_id[..market_name.len()].copy_from_slice(market_name.as_bytes());
+
         Ok(Config {
             venue,
             tick_seconds,
@@ -140,7 +175,28 @@ impl Config {
                 .map(|v| v.parse())
                 .transpose()?
                 .unwrap_or(GATE_B_DAILY_LOSS_BPS),
-            paper_dir: PathBuf::from(env("PAPER_DIR").unwrap_or_else(|| "paper".to_string())),
+            program_id: env("PROGRAM_ID").unwrap_or_else(|| DEFAULT_PROGRAM_ID.to_string()),
+            mandate: env("MANDATE").unwrap_or_default(),
+            venue_program: env("VENUE_PROGRAM")
+                .unwrap_or_else(|| DEFAULT_VENUE_PROGRAM.to_string()),
+            market_id,
+            operator_key_path: env("OPERATOR_KEY_PATH")
+                .unwrap_or_else(|| "keys/operator.json".to_string()),
+            redteam_wrong_mark_account: env("REDTEAM_WRONG_MARK_ACCOUNT"),
+            max_actions_per_hour: env("MAX_ACTIONS_PER_HOUR")
+                .map(|v| v.parse())
+                .transpose()?
+                .unwrap_or(DEFAULT_MAX_ACTIONS_PER_HOUR),
+            halt_env: env("HALT_ENV").unwrap_or_else(|| "HALT".to_string()),
+            halt_file: PathBuf::from(
+                env("HALT_FILE").unwrap_or_else(|| format!("{paper_dir_str}/HALT")),
+            ),
+            port: env("PORT").map(|v| v.parse()).transpose()?.unwrap_or(8080),
+            submit_attempts: env("SUBMIT_ATTEMPTS")
+                .map(|v| v.parse())
+                .transpose()?
+                .unwrap_or(3),
+            paper_dir: PathBuf::from(&paper_dir_str),
             paper_start_date,
             max_ticks: env("MAX_TICKS").map(|v| v.parse()).transpose()?,
         })

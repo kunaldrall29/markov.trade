@@ -4,7 +4,20 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license = "MIT"
-description = "RPC, transaction build, sign, send, confirm, retry."
+description = "RPC, transaction build, sign, send, confirm, retry. The only crate in the agent allowed to touch the network."
 publish = false
 
 [dependencies]
+bs58 = "0.5"
+solana-client = "4.2.2"
+solana-transaction-status-client-types = "4"
+solana-commitment-config = "3"
+solana-hash = "3"
+solana-keypair = "3"
+solana-pubkey = "3"
+solana-signature = "3"
+solana-signer = "3"
+solana-transaction = "4"
+solana-account = "4"
+thiserror = "2"
+tracing = "0.1"

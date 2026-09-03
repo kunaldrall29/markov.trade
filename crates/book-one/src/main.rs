@@ -8,13 +8,19 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use book_one::{config, core, paper, tick};
+use book_one::{agent, chainstate, config, core, health, paper, runtime, submitter, tick};
 
 use std::process::ExitCode;
+use std::str::FromStr;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
+use markov_chain::Chain;
 use markov_marks::{MarkSource, OnchainPyth};
+use solana_instruction::AccountMeta;
+use solana_pubkey::Pubkey;
 use tracing::{error, info, warn};
 
 fn main() -> ExitCode {
@@ -33,11 +39,6 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    if cfg.venue != config::Venue::Shadow {
-        error!("VENUE=devnet is not shipped until P07; refusing to boot");
-        return ExitCode::from(2);
-    }
-
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(e) => {
@@ -54,9 +55,161 @@ fn main() -> ExitCode {
     }
 }
 
+/// Everything devnet mode needs, or a reason it cannot run.
+///
+/// This is P07's pre-flight, executed rather than described: the mandate is
+/// read from the chain, its policy is compared with the Gate B template, the
+/// operator key is loaded, and the venue accounts are derived. Any of these
+/// failing is a refusal to boot — an agent that starts anyway and skips every
+/// tick would look, on the tape, exactly like a quiet market.
+fn boot_devnet(
+    cfg: &config::Config,
+    metrics: Arc<runtime::Metrics>,
+) -> anyhow::Result<(agent::Agent, chainstate::MandateSnapshot)> {
+    if cfg.mandate.trim().is_empty() {
+        anyhow::bail!("VENUE=devnet needs MANDATE set to the mandate's address");
+    }
+    let program = Pubkey::from_str(&cfg.program_id)?;
+    let mandate = Pubkey::from_str(&cfg.mandate)?;
+    let venue_program = Pubkey::from_str(&cfg.venue_program)?;
+
+    let chain = Chain::new(
+        &cfg.rpc_http_url,
+        &cfg.rpc_http_fallback,
+        Duration::from_secs(20),
+    );
+    let snapshot = chainstate::read_mandate(
+        &chain,
+        &mandate,
+        cfg.delta_band,
+        cfg.max_gross,
+        cfg.daily_loss_bps,
+    )?;
+
+    // Pre-flight 2: does the policy on chain match the template the pack
+    // specifies? A mismatch is reported in full and refuses the boot — running
+    // against a policy nobody agreed to is how a demo becomes a claim.
+    let differences = chainstate::gate_b_policy_differences(&snapshot.policy);
+    if !differences.is_empty() {
+        for d in &differences {
+            error!(difference = %d, "mandate policy does not match the Gate B template");
+        }
+        anyhow::bail!("{} policy differences; refusing to boot", differences.len());
+    }
+    if !snapshot.venues.contains(&venue_program) {
+        anyhow::bail!(
+            "the mandate's policy does not allow venue {venue_program}; every action would be refused at gate 5"
+        );
+    }
+
+    let (registry, _) = Pubkey::find_program_address(&[b"registry"], &program);
+    let (event_authority, _) = Pubkey::find_program_address(&[b"__event_authority"], &program);
+    let (venue_market, _) =
+        Pubkey::find_program_address(&[b"market", cfg.market_id.as_ref()], &venue_program);
+    let (venue_mark, _) =
+        Pubkey::find_program_address(&[b"mark", cfg.market_id.as_ref()], &venue_program);
+    let (venue_position, _) = Pubkey::find_program_address(
+        &[b"pos", mandate.as_ref(), cfg.market_id.as_ref()],
+        &venue_program,
+    );
+
+    let wiring = submitter::Wiring {
+        program,
+        registry,
+        mandate,
+        mint: snapshot.mint,
+        vault: snapshot.vault,
+        price_update: snapshot.mark_account,
+        venue_program,
+        token_program: Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")?,
+        event_authority,
+        // The mandate is forwarded because the venue needs its signature. The
+        // vault is not, and must never be: gate 15 refuses it (ADR-009).
+        venue_accounts: vec![
+            AccountMeta::new_readonly(mandate, false),
+            AccountMeta::new_readonly(venue_market, false),
+            AccountMeta::new_readonly(venue_mark, false),
+            AccountMeta::new(venue_position, false),
+        ],
+        market_id: cfg.market_id,
+    };
+    let sub = submitter::Submitter::new(&cfg.operator_key_path, wiring)?;
+
+    let wrong_mark_account = cfg
+        .redteam_wrong_mark_account
+        .as_deref()
+        .map(Pubkey::from_str)
+        .transpose()?;
+    if wrong_mark_account.is_none() {
+        warn!("REDTEAM_WRONG_MARK_ACCOUNT is unset; the StaleOracle probe will be skipped");
+    }
+
+    info!(
+        operator = %sub.operator(),
+        mandate = %mandate,
+        vault = %snapshot.vault,
+        mint = %snapshot.mint,
+        venue = %venue_program,
+        venue_position = %venue_position,
+        per_tx_cap = snapshot.policy.per_tx_cap,
+        daily_cap = snapshot.policy.daily_cap,
+        state = ?snapshot.state,
+        "devnet pre-flight passed"
+    );
+
+    Ok((
+        agent::Agent {
+            chain,
+            submitter: sub,
+            governor: runtime::Governor::new(cfg.max_actions_per_hour),
+            metrics,
+            redteam_last: Default::default(),
+            // §6: never in shadow. Shadow never reaches here, but stating it
+            // where the flag is set is better than relying on the call site.
+            redteam_enabled: cfg.venue == config::Venue::Devnet,
+            halt_env: cfg.halt_env.clone(),
+            halt_file: cfg.halt_file.clone(),
+            wrong_mark_account,
+            nonce: 0,
+            attempts: cfg.submit_attempts,
+        },
+        snapshot,
+    ))
+}
+
 async fn run(cfg: config::Config) -> anyhow::Result<()> {
     let store = paper::PaperStore::new(cfg.paper_dir.clone(), cfg.tick_seconds);
     store.ensure_dirs()?;
+
+    let metrics = Arc::new(runtime::Metrics::default());
+    // Devnet mode boots its chain wiring before anything else, so a
+    // misconfiguration fails loudly at start rather than as a skipped tick an
+    // hour later.
+    let mut agent = match cfg.venue {
+        config::Venue::Shadow => None,
+        config::Venue::Devnet => {
+            let (a, snap) = boot_devnet(&cfg, metrics.clone())?;
+            info!(state = ?snap.state, "devnet mode armed");
+            Some(a)
+        }
+    };
+
+    // Health and metrics on their own socket, so Railway can tell a wedged
+    // process from a quiet one (BACKLOG, open since P08).
+    let health = Arc::new(health::Health {
+        metrics: metrics.clone(),
+        tick_seconds: cfg.tick_seconds,
+        started_unix: Utc::now().timestamp(),
+    });
+    match tokio::net::TcpListener::bind(("0.0.0.0", cfg.port)).await {
+        Ok(listener) => {
+            info!(port = cfg.port, "health and metrics listening");
+            tokio::spawn(health::serve(listener, health, || Utc::now().timestamp()));
+        }
+        // Not fatal: the agent's job is the tape, and losing the healthcheck
+        // should not stop it producing one.
+        Err(e) => error!(port = cfg.port, error = %e, "could not bind the health port"),
+    }
     let label = source_label(&cfg);
     let mut source = OnchainPyth::new(
         cfg.rpc_http_url.clone(),
@@ -124,7 +277,47 @@ async fn run(cfg: config::Config) -> anyhow::Result<()> {
         tokio::time::sleep(Duration::from_millis(jitter_ms)).await;
 
         n += 1;
-        let record = tick::run_tick(&cfg, &mut source, &mut book, n).await;
+        let (mut record, verdict, policy) = tick::run_tick(&cfg, &mut source, &mut book, n).await;
+        runtime::Metrics::incr(&metrics.ticks_total);
+        metrics
+            .last_tick_unix
+            .store(record.ts_unix, Ordering::Relaxed);
+        match verdict {
+            markov_guard::Verdict::Skip => runtime::Metrics::incr(&metrics.skips_total),
+            markov_guard::Verdict::Allow(_) => runtime::Metrics::incr(&metrics.allows_total),
+            markov_guard::Verdict::Veto(_) => runtime::Metrics::incr(&metrics.vetoes_total),
+        }
+
+        if let Some(a) = agent.as_mut() {
+            // Re-read the mandate every tick: the owner may have paused,
+            // revoked or amended it since the last one, and acting on a
+            // remembered policy is acting on a policy that is not in force.
+            match chainstate::read_mandate(
+                &a.chain,
+                &a.submitter.wiring().mandate,
+                cfg.delta_band,
+                cfg.max_gross,
+                cfg.daily_loss_bps,
+            ) {
+                Ok(snapshot) => {
+                    a.act(
+                        record.ts_unix,
+                        record.slot,
+                        &snapshot,
+                        &snapshot.policy,
+                        &verdict,
+                        &mut record,
+                    );
+                }
+                Err(e) => {
+                    warn!(error = %e, "could not read the mandate; nothing submitted this tick");
+                    record.error = Some(format!("mandate read: {e}"));
+                }
+            }
+        } else {
+            record.withheld = Some(runtime::WITHHELD_SHADOW.to_string());
+        }
+        let _ = &policy;
         info!(
             tick_id = %record.tick_id,
             slot = record.slot,
@@ -135,6 +328,11 @@ async fn run(cfg: config::Config) -> anyhow::Result<()> {
             mark_age_s = record.mark_age_s,
             latency_ms = record.latency_ms,
             error = record.error.as_deref().unwrap_or("-"),
+            signature = record.signature.as_deref().unwrap_or("-"),
+            forced = record.forced,
+            withheld = record.withheld.as_deref().unwrap_or("-"),
+            onchain_reason = record.onchain_reason.as_deref().unwrap_or("-"),
+            redteam_probe = record.redteam_probe.as_deref().unwrap_or("-"),
             "tick"
         );
         store.record_tick(&record, Utc::now())?;

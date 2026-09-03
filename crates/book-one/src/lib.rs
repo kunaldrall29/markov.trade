@@ -5,8 +5,14 @@
 //! `VENUE=shadow` is the Gate B default and submits nothing. Nothing in here
 //! reads a clock or a socket except `tick` and `markov_marks`.
 
+pub mod agent;
+pub mod chainstate;
 pub mod config;
 pub mod core;
+pub mod health;
 pub mod paper;
+pub mod redteam;
+pub mod runtime;
 pub mod sidecar;
+pub mod submitter;
 pub mod tick;

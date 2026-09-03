@@ -33,6 +33,26 @@ pub struct TickRecord {
     pub reason_enforcement: Option<String>,
     pub latency_ms: u64,
     pub error: Option<String>,
+    /// Devnet mode only. All defaulted so tick logs written by a shadow runner
+    /// — or by a build before these existed — still parse.
+    #[serde(default)]
+    pub signature: Option<String>,
+    /// True when the red team forced this intent past the local guard. The
+    /// program still refused it; the flag exists so nobody can present a
+    /// forced refusal as organic.
+    #[serde(default)]
+    pub forced: bool,
+    /// Why nothing was sent, when the verdict alone does not explain it:
+    /// `shadow`, `halted`, `hourly_action_budget_exhausted`.
+    #[serde(default)]
+    pub withheld: Option<String>,
+    /// The reason the *program* gave, which is the one that counts. A
+    /// disagreement with `reason` is a guard divergence.
+    #[serde(default)]
+    pub onchain_reason: Option<String>,
+    /// Which red-team probe this tick carried, if any.
+    #[serde(default)]
+    pub redteam_probe: Option<String>,
 }
 
 pub async fn run_tick<S: MarkSource>(
@@ -40,7 +60,7 @@ pub async fn run_tick<S: MarkSource>(
     source: &mut S,
     book: &mut BookState,
     n: u64,
-) -> TickRecord {
+) -> (TickRecord, Verdict, PolicyView) {
     let t0 = std::time::Instant::now();
     let mark = source.get().await;
     // `now` is taken after the fetch so a mark published during the RPC round
@@ -121,7 +141,7 @@ pub async fn run_tick<S: MarkSource>(
     book.last_action = Some(intent.action);
     book.last_net_delta = book.net_delta;
 
-    TickRecord {
+    let record = TickRecord {
         tick_id: format!("{}-{n:06}", now.format("%Y%m%dT%H%M%SZ")),
         ts_unix: now.timestamp(),
         day: now.date_naive(),
@@ -136,9 +156,18 @@ pub async fn run_tick<S: MarkSource>(
         verdict: verdict_name.to_string(),
         reason,
         reason_enforcement: enforcement,
+        signature: None,
+        forced: false,
+        withheld: None,
+        onchain_reason: None,
+        redteam_probe: None,
         latency_ms: t0.elapsed().as_millis() as u64,
         error,
-    }
+    };
+    // The verdict and the policy go back with the record because the chain
+    // half of the tick needs both, and re-deriving them there would be a
+    // second source of truth for what this tick decided.
+    (record, verdict, policy)
 }
 
 pub const fn action_name(a: markov_types::ActionKind) -> &'static str {

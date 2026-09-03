@@ -18,7 +18,19 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+anchor-lang = "1.1.2"
+blake3 = "1"
+markov-chain = { path = "../markov-chain" }
 markov-guard = { path = "../markov-guard" }
+markov-mandate = { package = "markov_mandate", path = "../../programs/markov-mandate", features = [
+  "no-entrypoint",
+] }
+solana-instruction = "3"
+solana-keypair = "3"
+solana-message = "4"
+solana-pubkey = "3"
+solana-signer = "3"
+solana-transaction = "4"
 markov-marks = { path = "../markov-marks" }
 markov-types = { path = "../markov-types" }
 serde = { version = "1", features = ["derive"] }
