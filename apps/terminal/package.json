@@ -1,0 +1,39 @@
+{
+  "name": "@markov/terminal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000 -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3000} -H 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint",
+    "test": "node -e \"console.log('terminal: visual e2e is Playwright against a running API')\""
+  },
+  "dependencies": {
+    "@markov/facts": "workspace:*",
+    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-coinbase": "^0.1.23",
+    "@solana/wallet-adapter-phantom": "^0.9.28",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/wallet-adapter-react-ui": "^0.9.39",
+    "@solana/wallet-adapter-solflare": "^0.6.32",
+    "@solana/wallet-adapter-trust": "^0.1.17",
+    "@solana/web3.js": "^1.98.4",
+    "bs58": "^6.0.0",
+    "@tanstack/react-query": "^5.75.0",
+    "lucide-react": "^0.511.0",
+    "next": "^15.5.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.8",
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.5",
+    "tailwindcss": "^4.1.8",
+    "typescript": "^5.9.2"
+  }
+}

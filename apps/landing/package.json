@@ -1,0 +1,27 @@
+{
+  "name": "@markov/landing",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3100 -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3100} -H 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint",
+    "test": "node -e \"console.log('landing: claims check is repo-wide')\""
+  },
+  "dependencies": {
+    "@markov/facts": "workspace:*",
+    "next": "^15.5.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.8",
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.5",
+    "tailwindcss": "^4.1.8",
+    "typescript": "^5.9.2"
+  }
+}

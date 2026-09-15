@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+:root {
+  --cream: #ecebe6;
+  --clay: #f6f5f0;
+  --ink: #1c1c1a;
+  --blue: #2f3be0;
+  --muted: #5a5a56;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+a { color: inherit; }
+.eyebrow {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 10px 24px;
+  border-bottom: 1px solid rgba(28,28,26,.08);
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 80px; }
+h1 {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.96;
+  font-size: clamp(44px, 8vw, 88px);
+  margin: 28px 0 16px;
+}
+.blue { color: var(--blue); }
+.sub { max-width: 640px; font-size: 18px; line-height: 1.5; color: var(--muted); }
+nav { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.mark {
+  display: flex; gap: 10px; align-items: center;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800; font-size: 22px; letter-spacing: -0.04em; text-decoration: none;
+}
+.btn { background: var(--blue); color: #fff; border-radius: 999px; padding: 12px 18px; text-decoration: none; font-weight: 600; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 36px; }
+.card {
+  background: var(--clay);
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: inset 1px 1px 0 #fff, 0 10px 24px rgba(28,28,26,.06);
+}
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+section { margin-top: 72px; }
+h2 {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1;
+}
+footer { margin-top: 80px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+.ink { background: var(--ink); color: var(--cream); border-radius: 28px; padding: 28px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
