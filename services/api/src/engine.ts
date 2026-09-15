@@ -38,7 +38,14 @@ export type Cache = {
   mandates: MandateDraft[];
   investRules: Array<Record<string, unknown>>;
   idem: Map<string, { at: number; status: number; body: unknown }>;
-  program: { deployed: boolean; slot: number | null; at: number };
+  program: {
+    deployed: boolean;
+    slot: number | null;
+    at: number;
+    drift_executable: boolean | null;
+    phoenix_mainnet_executable: boolean | null;
+    subscriptions_executable: boolean | null;
+  };
 };
 
 const defaultMandate = (env: EnvConfig): MandateView => ({
@@ -68,7 +75,14 @@ export function createCache(env = loadEnv()): Cache {
     mandates: disk.mandates,
     investRules: disk.investRules,
     idem: new Map(),
-    program: { deployed: false, slot: null, at: 0 },
+    program: {
+      deployed: false,
+      slot: null,
+      at: 0,
+      drift_executable: null,
+      phoenix_mainnet_executable: null,
+      subscriptions_executable: null,
+    },
   };
 }
 

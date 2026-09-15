@@ -4,7 +4,7 @@ import websocket from "@fastify/websocket";
 import { randomBytes, randomUUID } from "node:crypto";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
-import { CANONICAL_MARKETS, REASON, REASON_NAME, STAGE, XSTOCKS } from "@markov/facts";
+import { CANONICAL_MARKETS, DRIFT_V2_PROGRAM, PHOENIX_PROD, REASON, REASON_NAME, STAGE, SUBSCRIPTIONS_PROGRAM, XSTOCKS } from "@markov/facts";
 import { loadEnv, readName } from "@markov/config";
 import {
   bestMark,
@@ -62,7 +62,11 @@ export async function buildServer() {
       phoenix_markets: cache.phoenix.size,
       last_pacifica_ok: cache.lastPacificaOk || null,
       last_phoenix_ok: cache.lastPhoenixOk || null,
+      drift_program_executable: cache.program.drift_executable,
+      phoenix_program_mainnet: cache.program.phoenix_mainnet_executable,
+      subscriptions_program_executable: cache.program.subscriptions_executable,
       receipts: cache.receipts.length,
+      note: "Drift program executable on this cluster is not an executable adapter until RPC+SDK subscribe produces a native mark.",
     };
   });
 
@@ -245,8 +249,8 @@ export async function buildServer() {
 
   app.post("/risk/simulate-trade", async (req) => {
     const body = req.body as { market: string; notional_usd: number; leverage: number; venue?: string };
-    const preview = policyPreview(cache, body);
-    return { env: env.name, policy: preview, projected: { notional_usd: body.notional_usd, leverage: body.leverage } };
+    const preview = await freshPreview(cache, body);
+    return { env: env.name, policy: preview, projected: { notional_usd: body.notional_usd, leverage: body.leverage }, label: "SIMULATED" };
   });
 
   app.post("/risk/simulate-scenario", async (req) => {
@@ -396,26 +400,98 @@ export async function buildServer() {
     return out;
   });
 
-  app.post("/trades/reduce", async (req) => {
-    const body = req.body as { market: string; notional_usd: number };
+  app.post("/trades/reduce", async (req, reply) => {
     const session = sessionOf(req, cache);
+    if (!session) return reply.code(401).send({ error: "SIWS required" });
+    const body = req.body as { market: string; side: "long" | "short"; notional_usd: number };
+    if (!body?.market || !body.side || !(body.notional_usd > 0)) {
+      return reply.code(400).send({ error: "market, side, notional_usd required" });
+    }
+    let state = cache.pacifica.get(body.market);
+    if (!state || Date.now() - state.venueTs > env.caps.freshnessPacificaMs) {
+      await refreshMarkets(cache);
+      state = cache.pacifica.get(body.market);
+    }
+    if (!state || Date.now() - state.venueTs > env.caps.freshnessPacificaMs) {
+      const receipt = recordReceipt(cache, {
+        request_id: randomUUID(),
+        actor: session.pubkey,
+        kind: "TradeReduce",
+        decision: "REJECT",
+        reason_code: REASON.STALE_MARKET_DATA,
+        reason: "STALE_MARKET_DATA",
+        mandate_version: activeMandate(cache, session.pubkey).version,
+        invest_mandate_version: 0,
+        data_slot: 0,
+        venue_id: 1,
+        market_id: body.market,
+        checks: [],
+        tx_signature: null,
+      });
+      return reply.code(409).send({ request_id: receipt.request_id, decision: "REJECT", reason: "STALE_MARKET_DATA" });
+    }
+    let built;
+    try {
+      built = buildPacificaCreateOrder({
+        account: session.pubkey,
+        symbol: body.market.replace("-PERP", ""),
+        side: body.side,
+        notionalUsd: body.notional_usd,
+        mark: state.mark,
+        tickSize: state.tickSize ?? 0.01,
+        lotSize: state.lotSize ?? 0.01,
+        bestBid: state.bids[0]?.price ?? null,
+        bestAsk: state.asks[0]?.price ?? null,
+        tif: "IOC",
+        reduceOnly: true,
+        clientOrderId: randomUUID(),
+      });
+    } catch (err) {
+      return reply.code(400).send({ error: "cannot build reduce", detail: String(err) });
+    }
     const request_id = randomUUID();
     const receipt = recordReceipt(cache, {
       request_id,
-      actor: session?.pubkey ?? "anonymous",
+      actor: session.pubkey,
       kind: "TradeReduce",
       decision: "REQUIRE_APPROVAL",
       reason_code: REASON.EXECUTION_CONFIRMED,
       reason: "REQUIRE_APPROVAL",
-      mandate_version: activeMandate(cache, session?.pubkey ?? "anonymous").version,
+      mandate_version: activeMandate(cache, session.pubkey).version,
       invest_mandate_version: 0,
-      data_slot: 0,
+      data_slot: state.slot ?? 0,
       venue_id: 1,
       market_id: body.market,
       checks: [],
       tx_signature: null,
     });
-    return { request_id, receipt_id: receipt.request_id, note: "Reduce is owner-signed. No position exists until a venue account is linked." };
+    cache.pending.unshift({
+      request_id,
+      status: "AWAITING_SIGNATURE",
+      actor: session.pubkey,
+      market: body.market,
+      compact_json: built.compactJson,
+      timestamp: built.timestamp,
+      expiry_window: built.expiry_window,
+      fields: built.fields,
+      created_at: receipt.created_at,
+    });
+    persist(cache);
+    return {
+      request_id,
+      receipt_id: receipt.request_id,
+      state: "AWAITING_SIGNATURE",
+      decision: "REQUIRE_APPROVAL",
+      signables: [
+        {
+          kind: "pacifica_message",
+          display: `reduce_only ${body.side} ${body.market} ${built.fields.amount} @ ${built.fields.price}`,
+          compact_json: built.compactJson,
+          fields: built.fields,
+          note: "Reduce is owner-signed. Pacifica still needs a live position for this to fill.",
+        },
+      ],
+    };
   });
 
   app.post("/trades/confirm-signature", async (req, reply) => confirmAndSubmit(req, reply, cache, env.name));
@@ -469,12 +545,17 @@ export async function buildServer() {
 
   app.get("/portfolio", async (req) => {
     const session = sessionOf(req, cache);
+    const mandate = session ? activeMandate(cache, session.pubkey) : null;
     return {
       env: env.name,
       equity: null,
       gross_notional: null,
+      net_delta: null,
+      effective_leverage: null,
       pubkey: session?.pubkey ?? null,
-      note: "Empty until a venue account is linked and returns balances.",
+      cap_notional_usd: mandate?.max_notional_usd ?? env.caps.perAccountGrossNotionalUsd,
+      cap_leverage: (mandate?.max_leverage_bps ?? 20_000) / 10_000,
+      note: "Empty until a venue account is linked and returns balances. Leverage is null, not 0x.",
     };
   });
   app.get("/portfolio/history", async () => ({
@@ -494,12 +575,20 @@ export async function buildServer() {
     }
   });
   app.get("/holdings", async () => ({ env: env.name, holdings: [] }));
-  app.get("/risk", async () => ({
-    env: env.name,
-    equity: null,
-    effective_leverage: null,
-    note: "No linked venue equity; leverage is null, not zero.",
-  }));
+  app.get("/risk", async (req) => {
+    const session = sessionOf(req, cache);
+    const mandate = session ? activeMandate(cache, session.pubkey) : null;
+    return {
+      env: env.name,
+      equity: null,
+      effective_leverage: null,
+      liquidation: null,
+      cap_leverage: (mandate?.max_leverage_bps ?? 20_000) / 10_000,
+      cap_notional_usd: mandate?.max_notional_usd ?? env.caps.perAccountGrossNotionalUsd,
+      daily_loss_usd: mandate?.max_daily_loss_usd ?? 50,
+      note: "No linked venue equity; leverage is null, not zero.",
+    };
+  });
 
   app.get("/mandate", async (req) => {
     const session = sessionOf(req, cache);
@@ -856,13 +945,18 @@ async function confirmAndSubmit(
   }
   receipt.tx_signature = body.signature;
   const pacEnv = envName === "devnet" ? "testnet" : "mainnet";
-  const submitted = await submitPacificaOrder(pacEnv, {
-    account: session.pubkey,
-    signature: body.signature,
-    timestamp: pending.timestamp,
-    expiry_window: pending.expiry_window,
-    fields: pending.fields,
-  });
+  let submitted: { status: number; body: unknown };
+  try {
+    submitted = await submitPacificaOrder(pacEnv, {
+      account: session.pubkey,
+      signature: body.signature,
+      timestamp: pending.timestamp,
+      expiry_window: pending.expiry_window,
+      fields: pending.fields,
+    });
+  } catch (err) {
+    submitted = { status: 0, body: { error: String(err) } };
+  }
   pending.venue_response = submitted.body;
   const ok = submitted.status >= 200 && submitted.status < 300 && (submitted.body as { success?: boolean }).success !== false;
   pending.status = ok ? "SUBMITTED" : "FAILED";
@@ -913,9 +1007,18 @@ function activeMandate(cache: Cache, owner: string) {
 async function maybeProbeProgram(cache: Cache) {
   if (Date.now() - cache.program.at < 15_000) return;
   cache.program.at = Date.now();
-  const probe = await getAccountExecutable(cache.env.rpcHttp, cache.env.programId);
-  cache.program.deployed = probe.deployed;
-  cache.program.slot = probe.slot;
+  const mainnet = "https://api.mainnet-beta.solana.com";
+  const [self, drift, phoenix, subs] = await Promise.all([
+    getAccountExecutable(cache.env.rpcHttp, cache.env.programId),
+    getAccountExecutable(cache.env.rpcHttp, DRIFT_V2_PROGRAM),
+    getAccountExecutable(mainnet, PHOENIX_PROD),
+    getAccountExecutable(cache.env.rpcHttp, SUBSCRIPTIONS_PROGRAM),
+  ]);
+  cache.program.deployed = self.deployed;
+  cache.program.slot = self.slot;
+  cache.program.drift_executable = drift.deployed;
+  cache.program.phoenix_mainnet_executable = phoenix.deployed;
+  cache.program.subscriptions_executable = subs.deployed;
 }
 
 const hits = new Map<string, number[]>();

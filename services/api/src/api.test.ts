@@ -2,9 +2,52 @@ process.env.MARKOV_DATA_DIR = "memory";
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createCache, policyPreview, routesFor } from "./engine.ts";
+import nacl from "tweetnacl";
+import bs58 from "bs58";
+import { createCache, policyPreview, routesFor, type Cache } from "./engine.ts";
 import { loadEnv } from "@markov/config";
 import { buildServer } from "./index.ts";
+import type { MarketState } from "@markov/adapters";
+
+function freshPacifica(cache: Cache, overrides: Partial<MarketState> = {}) {
+  cache.pacifica.set("SOL-PERP", {
+    venue: "pacifica",
+    symbol: "SOL",
+    mark: 100,
+    index: 100,
+    funding: 0,
+    nextFunding: 0,
+    openInterest: 1,
+    volume24h: 1,
+    change24h: 0,
+    bids: [{ price: 99.99, size: 50 }],
+    asks: [{ price: 100.01, size: 50 }],
+    venueTs: Date.now(),
+    fetchedAt: Date.now(),
+    slot: null,
+    takerFeeBps: 4,
+    makerFeeBps: 1.5,
+    maxLeverage: 50,
+    isolatedOnly: false,
+    tickSize: 0.01,
+    lotSize: 0.01,
+    minOrderSize: 10,
+    ...overrides,
+  });
+}
+
+async function siws(app: { inject: (opts: object) => Promise<{ statusCode: number; json: () => unknown }> }) {
+  const kp = nacl.sign.keyPair();
+  const pubkey = bs58.encode(kp.publicKey);
+  const ch = await app.inject({ method: "POST", url: "/auth/challenge", payload: { pubkey } });
+  assert.equal(ch.statusCode, 200);
+  const { nonce, message } = ch.json() as { nonce: string; message: string };
+  const signature = bs58.encode(nacl.sign.detached(new TextEncoder().encode(message), kp.secretKey));
+  const v = await app.inject({ method: "POST", url: "/auth/verify", payload: { pubkey, signature, nonce } });
+  assert.equal(v.statusCode, 200);
+  const { token } = v.json() as { token: string };
+  return { kp, pubkey, token, headers: { authorization: `Bearer ${token}` } };
+}
 
 test("Phoenix pin stays rejected for execution even with a fresh cache", () => {
   const cache = createCache(loadEnv("devnet"));
@@ -160,5 +203,90 @@ test("idempotent trade reject replays the same request_id", async () => {
   const b = await app.inject({ method: "POST", url: "/trades/request", headers: { "idempotency-key": "abc" }, payload });
   assert.equal(a.statusCode, 200);
   assert.equal((a.json() as { request_id: string }).request_id, (b.json() as { request_id: string }).request_id);
+  await app.close();
+});
+
+test("SIWS round-trip issues a session; a bad signature does not", async () => {
+  const { app } = await buildServer();
+  const ok = await siws(app);
+  const me = await app.inject({ method: "GET", url: "/auth/me", headers: ok.headers });
+  assert.equal(me.statusCode, 200);
+  assert.equal((me.json() as { pubkey: string }).pubkey, ok.pubkey);
+  const kp = nacl.sign.keyPair();
+  const pubkey = bs58.encode(kp.publicKey);
+  const ch = await app.inject({ method: "POST", url: "/auth/challenge", payload: { pubkey } });
+  const { nonce, message } = ch.json() as { nonce: string; message: string };
+  const other = nacl.sign.keyPair();
+  const bad = bs58.encode(nacl.sign.detached(new TextEncoder().encode(message), other.secretKey));
+  const v = await app.inject({ method: "POST", url: "/auth/verify", payload: { pubkey, signature: bad, nonce } });
+  assert.equal(v.statusCode, 401);
+  await app.close();
+});
+
+test("owner-signed ALLOW request builds compact JSON; submit is a venue ack not a fill", async () => {
+  const { app, cache } = await buildServer();
+  freshPacifica(cache);
+  const s = await siws(app);
+  const req = await app.inject({
+    method: "POST",
+    url: "/trades/request",
+    headers: s.headers,
+    payload: { market: "SOL-PERP", side: "long", notional_usd: 50, leverage: 1.5 },
+  });
+  assert.equal(req.statusCode, 200);
+  const body = req.json() as {
+    decision: string;
+    request_id: string;
+    signables: Array<{ compact_json: string; fields: { reduce_only: boolean; amount: string } }>;
+  };
+  assert.equal(body.decision, "REQUIRE_APPROVAL");
+  assert.ok(body.signables[0]?.compact_json);
+  assert.equal(body.signables[0].fields.reduce_only, false);
+  assert.equal(body.signables[0].fields.amount, "0.50");
+  const compact = body.signables[0].compact_json;
+  const signature = bs58.encode(nacl.sign.detached(new TextEncoder().encode(compact), s.kp.secretKey));
+  const sub = await app.inject({
+    method: "POST",
+    url: "/trades/submit",
+    headers: s.headers,
+    payload: { request_id: body.request_id, signature },
+  });
+  assert.equal(sub.statusCode, 200);
+  const out = sub.json() as { ok: boolean; receipt: { reason: string }; venue_status: number };
+  assert.equal(out.ok, false);
+  assert.equal(out.receipt.reason, "EXECUTION_FAILED");
+  assert.ok(typeof out.venue_status === "number");
+  await app.close();
+});
+
+test("reduce requires SIWS and sets reduce_only", async () => {
+  const { app, cache } = await buildServer();
+  const denied = await app.inject({
+    method: "POST",
+    url: "/trades/reduce",
+    payload: { market: "SOL-PERP", side: "short", notional_usd: 50 },
+  });
+  assert.equal(denied.statusCode, 401);
+  freshPacifica(cache);
+  const s = await siws(app);
+  const res = await app.inject({
+    method: "POST",
+    url: "/trades/reduce",
+    headers: s.headers,
+    payload: { market: "SOL-PERP", side: "short", notional_usd: 50 },
+  });
+  assert.equal(res.statusCode, 200);
+  const body = res.json() as { signables: Array<{ fields: { reduce_only: boolean } }> };
+  assert.equal(body.signables[0].fields.reduce_only, true);
+  await app.close();
+});
+
+test("risk and portfolio leave leverage null when equity is unknown", async () => {
+  const { app } = await buildServer();
+  const risk = await app.inject({ method: "GET", url: "/risk" });
+  const port = await app.inject({ method: "GET", url: "/portfolio" });
+  assert.equal(risk.statusCode, 200);
+  assert.equal((risk.json() as { effective_leverage: null }).effective_leverage, null);
+  assert.equal((port.json() as { equity: null }).equity, null);
   await app.close();
 });
