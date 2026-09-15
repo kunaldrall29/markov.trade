@@ -235,7 +235,7 @@ export async function buildServer() {
 
   app.post("/policy/check", async (req) => {
     const body = req.body as { market: string; venue?: string; notional_usd: number; leverage: number; max_slippage_bps?: number };
-    return policyPreview(cache, body);
+    return freshPreview(cache, body);
   });
 
   app.post("/routes/compare", async (req) => {
@@ -273,7 +273,7 @@ export async function buildServer() {
       max_slippage_bps?: number;
     };
     const session = sessionOf(req, cache);
-    const preview = policyPreview(cache, body);
+    const preview = await freshPreview(cache, body);
     const request_id = (req.headers["idempotency-key"] as string) || randomUUID();
     const actor = session?.pubkey ?? "anonymous";
     if (preview.decision !== "ALLOW") {
@@ -824,7 +824,7 @@ export async function buildServer() {
   const timer = setInterval(() => {
     refreshMarkets(cache).catch((err) => app.log.error(err));
     maybeProbeProgram(cache).catch((err) => app.log.error(err));
-  }, 2500);
+  }, 1200);
   app.addHook("onClose", async () => {
     clearInterval(timer);
   });
@@ -880,6 +880,18 @@ async function confirmAndSubmit(
       ? "Pacifica accepted the signed payload. This is a venue ack, not a guaranteed fill."
       : "Signature stored. Pacifica rejected or the account does not exist. Not a fill.",
   };
+}
+
+async function freshPreview(
+  cache: Cache,
+  body: { market: string; venue?: string; notional_usd: number; leverage: number; max_slippage_bps?: number },
+) {
+  let preview = policyPreview(cache, body);
+  if (preview.reason_code === REASON.STALE_MARKET_DATA) {
+    await refreshMarkets(cache);
+    preview = policyPreview(cache, body);
+  }
+  return preview;
 }
 
 function activeMandate(cache: Cache, owner: string) {
