@@ -92,6 +92,8 @@ Reveal cadence: receipt rows appear one at a time on a 700ms interval, `tape-in`
 
 ## 5. Page inventory
 
+> 2026-09-15: built. `/account` is added (wallet connect, your mandates and every owner verb); `Receipts` in the nav reads `Activity`. Data path per ADR-010. The header carries the wallet button. The e2e names in P11 map to `apps/web/tests/e2e/*.spec.ts` (`withdraw-enabled-in-every-state` is in `desk.spec.ts`).
+
 | Route | Job | Gate B |
 |---|---|---|
 | `/` | landing — sell the book, close with the lock | B1, B15 |

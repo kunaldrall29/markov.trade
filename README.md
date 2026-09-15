@@ -48,6 +48,20 @@
 | P14 | `prompts/P14-observability-ci.md` | Truth | B9 B15 |
 | P15 | `prompts/P15-gate-b-close.md` | Truth | B13 B14 B15 + close ritual |
 
+## The Terminal and the SDK (2026-09-15)
+
+`apps/web` is the reference client: `/account` (your mandates, wallet-signed verbs), `/book` (the house book read from the chain), `/receipts` (the program's feed), `/paper`, and a same-origin read API under `/api/v1/*` (ADR-010). `packages/sdk` is the typed `@solana/kit` client generated from `docs/idl/` plus receipt decoding, PDA derivation and the FACTS constants.
+
+```
+pnpm install
+pnpm --filter @markov/sdk test                # decoders vs program-crate bytes, PDAs vs devnet addresses
+pnpm --filter @markov/web dev                 # http://localhost:8080 — connect a devnet wallet
+pnpm --filter @markov/web e2e                 # Playwright against the fixture rpc (no network needed)
+E2E_RPC_URL=https://api.devnet.solana.com pnpm --filter @markov/web e2e   # read paths against devnet
+```
+
+Regenerate the client after an IDL change with `pnpm --filter @markov/sdk generate`; regenerate the Rust-serialised test fixtures with `pnpm --filter @markov/sdk fixtures`.
+
 ## Working script
 
 `scripts/copy-grep.sh` — B15. Claim-shaped, not token-shaped.
