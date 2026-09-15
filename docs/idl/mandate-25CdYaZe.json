@@ -206,7 +206,7 @@
       "name": "execute_venue_action",
       "docs": [
         "The operator proposes; the ladder decides; a receipt records it either",
-        "way. Gates 1–12 are in `gates::evaluate`; 13 and 14 are here, around",
+        "way. Gates 1\u201312 are in `gates::evaluate`; 13 and 14 are here, around",
         "the CPI."
       ],
       "discriminator": [
@@ -478,7 +478,7 @@
     {
       "name": "pause",
       "docs": [
-        "Owner or emergency key. Active → Paused."
+        "Owner or emergency key. Active \u2192 Paused."
       ],
       "discriminator": [
         211,
@@ -598,7 +598,7 @@
       "name": "set_global_halt",
       "docs": [
         "The circuit. When open, every `execute_venue_action` refuses with",
-        "`GlobalHalt` — and `owner_withdraw` still works."
+        "`GlobalHalt` \u2014 and `owner_withdraw` still works."
       ],
       "discriminator": [
         69,
@@ -819,7 +819,7 @@
     {
       "code": 6013,
       "name": "PostCheckFailed",
-      "msg": "post-check failed after the venue call: the vault, the owner, the operator or the policy moved"
+      "msg": "post-check failed after the venue call: the vault, the owner, the operator or the policy moved, or the venue reported filling more than was asked"
     }
   ],
   "types": [
@@ -858,7 +858,6 @@
     {
       "name": "ActionReceipt",
       "type": {
-        "kind": "struct",
         "fields": [
           {
             "name": "seq",
@@ -920,7 +919,18 @@
             "type": "u64"
           },
           {
+            "docs": [
+              "The price the venue reported filling at. Never a limit, never a mark:",
+              "if the venue reports no fill, no `ActionReceipt` is emitted at all."
+            ],
             "name": "fill_price",
+            "type": "u64"
+          },
+          {
+            "docs": [
+              "The venue's fee on this fill, as the venue reported it."
+            ],
+            "name": "fee",
             "type": "u64"
           },
           {
@@ -948,24 +958,25 @@
             "type": "u64"
           },
           {
-            "name": "net_delta_usd_e6",
             "docs": [
               "Metadata; enforced off-chain in v0 (ADR-05). The page must label these."
             ],
+            "name": "net_delta_usd_e6",
             "type": "i64"
           },
           {
             "name": "gross_usd_e6",
             "type": "u64"
           }
-        ]
+        ],
+        "kind": "struct"
       }
     },
     {
-      "name": "BlockReason",
       "docs": [
         "Machine-readable refusal reason. Discriminant = on-chain byte."
       ],
+      "name": "BlockReason",
       "repr": {
         "kind": "rust"
       },
@@ -1022,6 +1033,9 @@
           },
           {
             "name": "PostCheckFailed"
+          },
+          {
+            "name": "ControlledAccountForwarded"
           }
         ]
       }
@@ -1318,7 +1332,7 @@
             "name": "reserve",
             "docs": [
               "Room for the Phase-1 fields (`max_net_delta_usd`, `max_gross_usd` on",
-              "chain) without a migration (docs/10 §1.1)."
+              "chain) without a migration (docs/10 \u00a71.1)."
             ],
             "type": {
               "array": [
@@ -1348,14 +1362,13 @@
       }
     },
     {
-      "name": "OwnerAction",
       "docs": [
         "The owner's own moves, so the feed can show them next to the agent's.",
-        "B6's proof is a pair — revoke, then the next attempt refused — and both",
+        "B6's proof is a pair \u2014 revoke, then the next attempt refused \u2014 and both",
         "halves have to be indexable."
       ],
+      "name": "OwnerAction",
       "type": {
-        "kind": "struct",
         "fields": [
           {
             "name": "kind",
@@ -1374,10 +1387,10 @@
             "type": "pubkey"
           },
           {
-            "name": "actor",
             "docs": [
               "Who signed. For pause/revoke this may be the emergency key."
             ],
+            "name": "actor",
             "type": "pubkey"
           },
           {
@@ -1405,7 +1418,8 @@
             "name": "slot",
             "type": "u64"
           }
-        ]
+        ],
+        "kind": "struct"
       }
     },
     {
@@ -1511,7 +1525,7 @@
             "name": "max_mark_age_secs",
             "docs": [
               "Freshness in **seconds** since the mark's `publish_time` (ADR-003:",
-              "seconds, not slots — devnet pacing is ≈165 ms/slot and moves)."
+              "seconds, not slots \u2014 devnet pacing is \u2248165 ms/slot and moves)."
             ],
             "type": "u64"
           },
@@ -1519,7 +1533,7 @@
             "name": "expiry_ts",
             "docs": [
               "Unix seconds. The expiry gate reads this; `amend_policy` may only",
-              "shorten it. (docs/10 §1.2 puts expiry in the policy; the mandate keeps",
+              "shorten it. (docs/10 \u00a71.2 puts expiry in the policy; the mandate keeps",
               "`created_at` only, so there is one source of truth.)"
             ],
             "type": "i64"
@@ -1638,7 +1652,6 @@
     {
       "name": "RefusalReceipt",
       "type": {
-        "kind": "struct",
         "fields": [
           {
             "name": "seq",
@@ -1683,10 +1696,10 @@
             "type": "u64"
           },
           {
-            "name": "reason",
             "docs": [
-              "`BlockReason` discriminant; 0–10 are the eleven the predecessor emitted."
+              "`BlockReason` discriminant; 0\u201310 are the eleven the predecessor emitted."
             ],
+            "name": "reason",
             "type": {
               "defined": {
                 "name": "BlockReason"
@@ -1694,10 +1707,10 @@
             }
           },
           {
-            "name": "gate_index",
             "docs": [
-              "Which rung of the ladder refused, 1-based, matching docs/10 §3."
+              "Which rung of the ladder refused, 1-based, matching docs/10 \u00a73."
             ],
+            "name": "gate_index",
             "type": "u8"
           },
           {
@@ -1712,7 +1725,8 @@
             "name": "slot",
             "type": "u64"
           }
-        ]
+        ],
+        "kind": "struct"
       }
     },
     {

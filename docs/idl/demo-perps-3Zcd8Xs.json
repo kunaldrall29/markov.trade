@@ -8,14 +8,273 @@
   },
   "instructions": [
     {
+      "name": "init_market",
+      "docs": [
+        "Create a market. The authority is the deployer on devnet; it can pause",
+        "and re-parameterise, and it can never move a token because there are",
+        "none here."
+      ],
+      "discriminator": [
+        33,
+        253,
+        15,
+        116,
+        89,
+        25,
+        127,
+        236
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true
+        },
+        {
+          "name": "mark",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitMarketArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_position",
+      "docs": [
+        "Create the position record for one mandate and market. Separate from",
+        "`venue_execute` so the write path needs no payer and no system program:",
+        "the mandate PDA signs the trade, it does not fund accounts."
+      ],
+      "discriminator": [
+        197,
+        20,
+        10,
+        1,
+        97,
+        160,
+        177,
+        91
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "mandate",
+          "type": "pubkey"
+        },
+        {
+          "name": "market_id",
+          "type": {
+            "array": [
+              "u8",
+              16
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "post_mark",
+      "docs": [
+        "The house fallback (ADR-003). Only the allowlisted poster may call it,",
+        "and it may write **nothing but** price, expo, publish time and slot \u2014",
+        "it cannot pause a market, cannot open a position and holds no tokens.",
+        "`source` records `house`, which the page must display as a house mark."
+      ],
+      "discriminator": [
+        224,
+        48,
+        77,
+        105,
+        2,
+        74,
+        42,
+        145
+      ],
+      "accounts": [
+        {
+          "name": "poster",
+          "signer": true
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "mark",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "price",
+          "type": "i64"
+        },
+        {
+          "name": "expo",
+          "type": "i32"
+        },
+        {
+          "name": "publish_time",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "post_mark_from_pyth",
+      "docs": [
+        "Relay a Pyth price onto the market's mark account. Anyone may call it \u2014",
+        "there is nothing to gain, because the price is read from the Pyth",
+        "account itself and verified (owner, feed id, `Full`, freshness) rather",
+        "than supplied by the caller. `source` records `pyth`."
+      ],
+      "discriminator": [
+        77,
+        54,
+        241,
+        111,
+        235,
+        78,
+        124,
+        27
+      ],
+      "accounts": [
+        {
+          "name": "market"
+        },
+        {
+          "name": "mark",
+          "writable": true
+        },
+        {
+          "name": "price_update",
+          "docs": [
+            "Owner-checked by Anchor: it must be a Pyth receiver account."
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "feed_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_market_params",
+      "docs": [
+        "Re-parameterise a market. Authority only, and it can only ever change",
+        "numbers \u2014 there is no token here to move, and it cannot rewrite a",
+        "position or a mark."
+      ],
+      "discriminator": [
+        131,
+        124,
+        191,
+        102,
+        22,
+        237,
+        251,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "max_age_slots",
+          "type": "u64"
+        },
+        {
+          "name": "position_cap",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_market_paused",
+      "discriminator": [
+        233,
+        31,
+        161,
+        248,
+        178,
+        111,
+        102,
+        65
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "venue_execute",
       "docs": [
-        "The adapter entry point. The **mandate PDA** must sign: the operator",
-        "key never reaches a venue directly.",
+        "The adapter entry point. The **mandate PDA must sign**: the operator",
+        "key never reaches a venue directly, so a stolen operator key cannot",
+        "move a position without first passing the mandate program's ladder.",
         "",
-        "P02 scope: accept a well-formed call from a mandate and record it in",
-        "the log. No position is opened, no token moves, nothing is filled —",
-        "P04 adds all of that, and until then no page may claim a fill."
+        "Fills deterministically at `mark \u00b1 fee_bps` and reports the fill with",
+        "`set_return_data`, because a CPI cannot return a value and the mandate",
+        "program must not guess one."
       ],
       "discriminator": [
         32,
@@ -31,9 +290,20 @@
         {
           "name": "mandate",
           "docs": [
-            "The mandate PDA, signing through `invoke_signed`."
+            "The mandate PDA, signing through `invoke_signed`. Nothing else can",
+            "move a position."
           ],
           "signer": true
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "mark"
+        },
+        {
+          "name": "position",
+          "writable": true
         }
       ],
       "args": [
@@ -48,25 +318,433 @@
       ]
     }
   ],
-  "errors": [
+  "accounts": [
     {
-      "code": 6000,
-      "name": "InvalidNotional",
-      "msg": "notional must be greater than zero"
+      "name": "MarkAccount",
+      "discriminator": [
+        223,
+        5,
+        121,
+        212,
+        176,
+        152,
+        60,
+        171
+      ]
     },
     {
-      "code": 6001,
-      "name": "InvalidLimitPrice",
-      "msg": "limit price must be greater than zero"
+      "name": "Market",
+      "discriminator": [
+        219,
+        190,
+        213,
+        55,
+        0,
+        227,
+        198,
+        154
+      ]
+    },
+    {
+      "name": "Position",
+      "discriminator": [
+        170,
+        188,
+        143,
+        228,
+        122,
+        64,
+        247,
+        208
+      ]
     }
   ],
   "types": [
     {
+      "name": "InitMarketArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "base_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_age_slots",
+            "type": "u64"
+          },
+          {
+            "name": "position_cap",
+            "type": "u64"
+          },
+          {
+            "name": "poster",
+            "docs": [
+              "The only key allowed to call `post_mark`."
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarkAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "price",
+            "type": "i64"
+          },
+          {
+            "name": "expo",
+            "type": "i32"
+          },
+          {
+            "name": "publish_time",
+            "type": "i64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "source",
+            "docs": [
+              "`pyth` or `house`, on chain, so no surface has to guess."
+            ],
+            "type": {
+              "defined": {
+                "name": "MarkSourceKind"
+              }
+            }
+          },
+          {
+            "name": "poster",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarkPosted",
+      "type": {
+        "fields": [
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "price",
+            "type": "i64"
+          },
+          {
+            "name": "expo",
+            "type": "i32"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "source",
+            "type": {
+              "defined": {
+                "name": "MarkSourceKind"
+              }
+            }
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "name": "MarkSourceKind",
+      "docs": [
+        "Where a mark came from. On chain, so the page can say it rather than guess."
+      ],
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pyth"
+          },
+          {
+            "name": "House"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Market",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "base_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "mark",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_age_slots",
+            "type": "u64"
+          },
+          {
+            "name": "position_cap",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Position",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mandate",
+            "type": "pubkey"
+          },
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "Side"
+              }
+            }
+          },
+          {
+            "name": "notional",
+            "type": "u64"
+          },
+          {
+            "name": "entry_price",
+            "type": "u64"
+          },
+          {
+            "name": "funding_accrued",
+            "docs": [
+              "Signed: negative means this position paid funding."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "updated_slot",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceFeedMessage",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "feed_id",
+            "docs": [
+              "`FeedId` but avoid the type alias because of compatibility issues with Anchor's `idl-build` feature."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "price",
+            "type": "i64"
+          },
+          {
+            "name": "conf",
+            "type": "u64"
+          },
+          {
+            "name": "exponent",
+            "type": "i32"
+          },
+          {
+            "name": "publish_time",
+            "docs": [
+              "The timestamp of this price update in seconds"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "prev_publish_time",
+            "docs": [
+              "The timestamp of the previous price update. This field is intended to allow users to",
+              "identify the single unique price update for any moment in time:",
+              "for any time t, the unique update is the one such that prev_publish_time < t <= publish_time.",
+              "",
+              "Note that there may not be such an update while we are migrating to the new message-sending logic,",
+              "as some price updates on pythnet may not be sent to other chains (because the message-sending",
+              "logic may not have triggered). We can solve this problem by making the message-sending mandatory",
+              "(which we can do once publishers have migrated over).",
+              "",
+              "Additionally, this field may be equal to publish_time if the message is sent on a slot where",
+              "where the aggregation was unsuccesful. This problem will go away once all publishers have",
+              "migrated over to a recent version of pyth-agent."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "ema_price",
+            "type": "i64"
+          },
+          {
+            "name": "ema_conf",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceUpdateV2",
+      "docs": [
+        "A price update account. This account is used by the Pyth Receiver program to store a verified price update from a Pyth price feed.",
+        "It contains:",
+        "- `write_authority`: The write authority for this account. This authority can close this account to reclaim rent or update the account to contain a different price update.",
+        "- `verification_level`: The [`VerificationLevel`] of this price update. This represents how many Wormhole guardian signatures have been verified for this price update.",
+        "- `price_message`: The actual price update.",
+        "- `posted_slot`: The slot at which this price update was posted."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "write_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "verification_level",
+            "type": {
+              "defined": {
+                "name": "VerificationLevel"
+              }
+            }
+          },
+          {
+            "name": "price_message",
+            "type": {
+              "defined": {
+                "name": "PriceFeedMessage"
+              }
+            }
+          },
+          {
+            "name": "posted_slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Side",
+      "docs": [
+        "Which way a position leans. Shared so the agent, the program and the",
+        "indexer spell it the same way."
+      ],
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Long"
+          },
+          {
+            "name": "Short"
+          }
+        ]
+      }
+    },
+    {
       "name": "VenueExecuteArgs",
       "docs": [
-        "Mirrors `markov_mandate::cpi::venue::VenueExecuteArgs`. P03 makes this one",
-        "shared definition; until then the two must be kept identical, which the",
-        "mandate's `sighash` test and this program's discriminator pin down."
+        "Mirrors `markov_mandate::cpi::venue::VenueExecuteArgs`. The two must stay",
+        "identical; the mandate's `sighash` test and this program's discriminator",
+        "pin the encoding, and `markov-venue`'s conformance suite pins the meaning."
       ],
       "type": {
         "kind": "struct",
@@ -95,9 +773,216 @@
           {
             "name": "limit_price",
             "type": "u64"
+          },
+          {
+            "name": "max_slippage_bps",
+            "type": "u16"
           }
         ]
       }
+    },
+    {
+      "name": "VenueFilled",
+      "type": {
+        "fields": [
+          {
+            "name": "mandate",
+            "type": "pubkey"
+          },
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "action",
+            "type": "u8"
+          },
+          {
+            "name": "side",
+            "type": "u8"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "notional",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "mark_price",
+            "type": "u64"
+          },
+          {
+            "name": "mark_source",
+            "type": {
+              "defined": {
+                "name": "MarkSourceKind"
+              }
+            }
+          },
+          {
+            "name": "position_notional",
+            "type": "u64"
+          },
+          {
+            "name": "funding_accrued",
+            "type": "i64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "name": "VerificationLevel",
+      "docs": [
+        "Pyth price updates are bridged to all blockchains via Wormhole.",
+        "Using the price updates on another chain requires verifying the signatures of the Wormhole guardians.",
+        "The usual process is to check the signatures for two thirds of the total number of guardians, but this can be cumbersome on Solana because of the transaction size limits,",
+        "so we also allow for partial verification.",
+        "",
+        "This enum represents how much a price update has been verified:",
+        "- If `Full`, we have verified the signatures for two thirds of the current guardians.",
+        "- If `Partial`, only `num_signatures` guardian signatures have been checked.",
+        "",
+        "# Warning",
+        "Using partially verified price updates is dangerous, as it lowers the threshold of guardians that need to collude to produce a malicious price update."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Partial",
+            "fields": [
+              {
+                "name": "num_signatures",
+                "type": "u8"
+              }
+            ]
+          },
+          {
+            "name": "Full"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "MarketUnknown",
+      "msg": "market unknown to this venue"
+    },
+    {
+      "code": 6001,
+      "name": "StaleMark",
+      "msg": "the venue's mark is stale"
+    },
+    {
+      "code": 6002,
+      "name": "SlippageExceeded",
+      "msg": "fill would breach the limit price"
+    },
+    {
+      "code": 6003,
+      "name": "InsufficientCollateral",
+      "msg": "not enough collateral"
+    },
+    {
+      "code": 6004,
+      "name": "PositionLimit",
+      "msg": "position limit reached"
+    },
+    {
+      "code": 6005,
+      "name": "VenuePaused",
+      "msg": "venue is paused"
+    },
+    {
+      "code": 6006,
+      "name": "NoPosition",
+      "msg": "no position to reduce or close"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidNotional",
+      "msg": "notional must be greater than zero"
+    },
+    {
+      "code": 6008,
+      "name": "UnknownAction",
+      "msg": "unknown action"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidParameter",
+      "msg": "invalid parameter"
+    },
+    {
+      "code": 6010,
+      "name": "WrongMark",
+      "msg": "wrong mark account for this market"
+    },
+    {
+      "code": 6011,
+      "name": "WrongPoster",
+      "msg": "only the allowlisted poster may post a house mark"
+    },
+    {
+      "code": 6012,
+      "name": "WrongAuthority",
+      "msg": "wrong market authority"
+    },
+    {
+      "code": 6013,
+      "name": "WrongMandate",
+      "msg": "this position belongs to another mandate"
+    },
+    {
+      "code": 6014,
+      "name": "Math",
+      "msg": "arithmetic overflow"
+    }
+  ],
+  "events": [
+    {
+      "discriminator": [
+        168,
+        153,
+        101,
+        170,
+        161,
+        86,
+        79,
+        110
+      ],
+      "name": "MarkPosted"
+    },
+    {
+      "discriminator": [
+        219,
+        143,
+        140,
+        156,
+        178,
+        113,
+        95,
+        144
+      ],
+      "name": "VenueFilled"
     }
   ]
 }

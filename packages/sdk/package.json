@@ -1,11 +1,35 @@
 {
   "name": "@markov/sdk",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "Codama-generated Kit client from the markov-mandate IDL (P11). Checked in once generated.",
+  "description": "Typed @solana/kit client for the Markov mandate program and the demo_perps venue, generated from the checked-in IDLs with Codama, plus receipt decoding, PDA derivation, chain readers and the FACTS constants every surface must use.",
   "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./generated/mandate": "./src/generated/mandate/index.ts",
+    "./generated/demo-perps": "./src/generated/demoPerps/index.ts"
+  },
   "scripts": {
-    "build": "echo '@markov/sdk: nothing to build until the P02 IDL exists'",
-    "typecheck": "echo '@markov/sdk: nothing to typecheck yet'"
+    "generate": "node scripts/generate.mjs",
+    "fixtures": "cargo run -q --manifest-path ../../Cargo.toml -p markov_mandate --example ts_fixtures > test/fixtures/program.json",
+    "facts:check": "node scripts/facts-check.mjs",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "node scripts/facts-check.mjs"
+  },
+  "dependencies": {
+    "@solana/kit": "^8.3.0",
+    "@solana-program/token": "^0.16.1",
+    "@solana-program/system": "^0.14.1"
+  },
+  "devDependencies": {
+    "@codama/nodes-from-anchor": "^1.5.6",
+    "@codama/renderers-js": "^2.5.0",
+    "codama": "^1.11.0",
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.0",
+    "@types/node": "^22.16.5"
   }
 }

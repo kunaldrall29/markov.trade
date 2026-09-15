@@ -3027,6 +3027,7 @@ dependencies = [
  "litesvm",
  "markov-types",
  "pyth-solana-receiver-sdk",
+ "serde_json",
  "solana-account 4.3.2",
  "solana-client",
  "solana-commitment-config",
