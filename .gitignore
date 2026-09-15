@@ -30,3 +30,4 @@ coverage/
 # generated
 apps/terminal/next-env.d.ts
 apps/landing/next-env.d.ts
+*.tsbuildinfo
