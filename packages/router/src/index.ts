@@ -32,8 +32,8 @@ export function compareRoutes(
     const entryBps = q.slippageBps + q.takerFeeBps;
     const totalBps = entryBps + holdingBps + q.exitBps + q.riskPremiumBps;
     let reason = `${q.venue}: entry ${entryBps.toFixed(1)} + holding ${holdingBps.toFixed(1)} + exit ${q.exitBps.toFixed(1)}`;
-    if (!q.linked) reason = `${q.venue} has no linked funded account`;
-    else if (!q.executable) reason = `${q.venue} is integrated, not executable`;
+    if (!q.executable) reason = `${q.venue} is integrated, not executable`;
+    else if (!q.linked) reason = `${q.venue} has no linked funded account`;
     else if (q.stale) reason = `${q.venue} data is stale`;
     return {
       ...q,

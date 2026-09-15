@@ -18,9 +18,9 @@ export default function Home() {
         {STAGE}
       </p>
       <h1>
-        Perps that obey
+        Perps that obey{" "}
         <br />
-        <span className="blue">your rules</span>, not
+        <span className="blue">your rules</span>, not{" "}
         <br />
         just your orders.
       </h1>

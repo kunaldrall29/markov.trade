@@ -42,7 +42,9 @@ export default function Overview() {
       <div>
         <p className="chip" style={{ background: "white" }}>{stageLabel}</p>
         <h1 className="mt-3 text-[40px] leading-[0.95] tracking-[-0.04em]" style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>
-          Capital may only do<br />what you allowed.
+          Capital may only do{" "}
+          <br />
+          what you allowed.
         </h1>
           <p className="mt-3 max-w-xl text-[15px] text-[var(--mk-muted)]">
           Live Pacifica and Phoenix marks. Drift executable after RPC subscribe. Phoenix is read-only. Empty panels are empty.

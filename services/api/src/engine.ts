@@ -60,7 +60,8 @@ export function dto(canonical: string, state: MarketState, env: EnvConfig, execu
   const m = mid(state.bids, state.asks);
   const d10 = m ? depthNotional(state.bids, m, 10, "bid") + depthNotional(state.asks, m, 10, "ask") : null;
   const d50 = m ? depthNotional(state.bids, m, 50, "bid") + depthNotional(state.asks, m, 50, "ask") : null;
-  const freshness = Date.now() - state.venueTs;
+  const printAge = Date.now() - state.venueTs;
+  const fetchAge = Date.now() - state.fetchedAt;
   const limit = state.venue === "phoenix" ? env.caps.freshnessPhoenixMs : env.caps.freshnessPacificaMs;
   return {
     canonical_market_id: canonical,
@@ -80,9 +81,9 @@ export function dto(canonical: string, state: MarketState, env: EnvConfig, execu
     isolated_only: state.isolatedOnly,
     taker_fee_bps: state.takerFeeBps,
     maker_fee_bps: state.makerFeeBps,
-    health: freshness <= limit * 3 ? "ok" : "degraded",
-    freshness_ms: freshness,
-    stale: freshness > limit,
+    health: fetchAge <= limit * 3 ? "ok" : "degraded",
+    freshness_ms: printAge,
+    stale: fetchAge > limit * 2 || printAge > 15_000,
     executable,
     env: env.name,
     venue_ts: state.venueTs,
