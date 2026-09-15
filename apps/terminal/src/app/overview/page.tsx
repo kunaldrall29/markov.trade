@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { stageLabel } from "@/lib/env";
 
-type Health = { ok: boolean; env: string; pacifica_markets: number; phoenix_markets: number; program_deployed: boolean; receipts: number };
+      type Health = { ok: boolean; env: string; pacifica_markets: number; phoenix_markets: number; program_deployed: boolean; receipts: number; drift_program_executable: boolean | null };
 type Markets = { markets: Array<{ canonical_market_id: string; venue: string; mark: number | null; stale: boolean; executable: boolean; funding: number | null; freshness_ms: number }> };
 type Receipts = { receipts: Array<{ request_id: string; decision: string; reason: string; market_id: string }> };
 
@@ -62,7 +62,7 @@ export default function Overview() {
           <h2 className="text-[13px] font-semibold">Linked venues</h2>
           <ul className="mt-3 grid gap-2 text-[13px]">
             <li className="flex justify-between"><span>Pacifica {health ? `(${health.pacifica_markets} cached)` : ""}</span><span className="chip" style={{ background: "#e8edff", color: "var(--mk-blue)" }}>executable · {health?.env}</span></li>
-            <li className="flex justify-between"><span>Drift</span><span className="chip" style={{ background: "white" }}>stale-closed · no HTTP</span></li>
+            <li className="flex justify-between"><span>Drift</span><span className="chip" style={{ background: "white" }}>{health?.drift_program_executable ? "program live · adapter closed" : "stale-closed · no HTTP"}</span></li>
             <li className="flex justify-between"><span>Phoenix</span><span className="chip" style={{ background: "white" }}>INTEGRATED · read-only</span></li>
             <li className="flex justify-between"><span>Program</span><span className="chip" style={{ background: "white" }}>{health?.program_deployed ? "on chain" : "undeployed"}</span></li>
           </ul>

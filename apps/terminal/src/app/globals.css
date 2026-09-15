@@ -87,7 +87,8 @@ button { font-family: inherit; }
 @media (max-width: 640px) {
   .wallet-adapter-button { max-width: 42vw; overflow: hidden; }
 }
-.wallet-adapter-modal-wrapper { font-family: var(--font-body), system-ui, sans-serif !important; }
+.wallet-adapter-modal-wrapper { font-family: var(--font-body), system-ui, sans-serif !important; z-index: 80 !important; }
+.wallet-adapter-modal { z-index: 80 !important; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

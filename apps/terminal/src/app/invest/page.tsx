@@ -100,8 +100,21 @@ export default function Invest() {
         ) : (
           <ul className="mt-3 grid gap-2 text-[13px] font-mono">
             {rules.map((r) => (
-              <li key={r.id}>
-                {r.status} · ${r.usd_per_period} · {r.mint.slice(0, 8)}…
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  {r.status} · ${r.usd_per_period} · {r.mint.slice(0, 8)}…
+                </span>
+                <button
+                  className="btn btn-ghost"
+                  disabled={!connected}
+                  onClick={() =>
+                    void api("/invest/pause", { method: "POST", body: JSON.stringify({ id: r.id }) }).then(() =>
+                      api<{ rules: Rule[] }>("/invest/rules").then((n) => setRules(n.rules)),
+                    )
+                  }
+                >
+                  Pause
+                </button>
               </li>
             ))}
           </ul>

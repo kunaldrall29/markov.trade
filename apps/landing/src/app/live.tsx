@@ -11,7 +11,7 @@ export function LiveStrip() {
       .then((r) => r.json())
       .then((h: { pacifica_markets?: number; phoenix_markets?: number; program_deployed?: boolean }) => {
         setText(
-          `live: ${h.pacifica_markets ?? 0} pacifica · ${h.phoenix_markets ?? 0} phoenix · program ${h.program_deployed ? "on chain" : "undeployed"}`,
+          `live: ${h.pacifica_markets ?? 0} pacifica · ${h.phoenix_markets ?? 0} phoenix · program ${h.program_deployed ? "on chain" : "undeployed"} · drift adapter closed`,
         );
       })
       .catch(() => setText("control plane not reached"));

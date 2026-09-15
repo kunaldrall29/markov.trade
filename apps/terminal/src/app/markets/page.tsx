@@ -48,7 +48,7 @@ export default function Markets() {
       <h1 className="text-[32px] tracking-[-0.04em]" style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>Markets</h1>
       <input className="clay px-4 py-3 text-[14px] outline-none w-full" placeholder="Search SOL-PERP" value={q} onChange={(e) => setQ(e.target.value)} />
       {err && <p className="text-[var(--mk-signal)] text-[13px]">{err}</p>}
-      <div className="clay overflow-x-auto">
+      <div className="hidden sm:block clay overflow-x-auto">
         <table className="w-full text-left text-[13px]">
           <thead className="text-[11px] uppercase tracking-[0.08em] text-[var(--mk-muted)] font-mono">
             <tr>
@@ -83,6 +83,32 @@ export default function Markets() {
             })}
           </tbody>
         </table>
+      </div>
+      <div className="sm:hidden grid gap-3">
+        {grouped.length === 0 && (
+          <div className="clay p-4 text-[14px] text-[var(--mk-muted)]">No live rows yet — waiting on Pacifica/Phoenix, or the API is down.</div>
+        )}
+        {grouped.map(([id, vs]) => {
+          const best = vs.find((v) => v.executable && !v.stale) ?? vs[0];
+          return (
+            <Link key={id} href={`/markets/${id}`} className="clay p-4 block">
+              <div className="flex justify-between gap-2">
+                <span className="font-semibold">{id}</span>
+                <span className="num text-[18px]" style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>
+                  {best?.mark?.toFixed(3) ?? "—"}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {vs.map((v) => (
+                  <span key={v.venue} className="chip" style={{ background: v.executable ? "#e8edff" : "white" }}>
+                    {v.venue}
+                    {v.executable ? "" : " ro"}
+                  </span>
+                ))}
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

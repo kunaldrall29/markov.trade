@@ -45,7 +45,7 @@ export default function Approvals() {
                   {p.status}
                 </span>
               </div>
-              <pre className="mt-2 overflow-auto text-[11px] font-mono">{JSON.stringify(p.payload, null, 2)}</pre>
+              <pre className="mt-2 overflow-auto text-[11px] font-mono max-h-40">{JSON.stringify(p.payload, null, 2)}</pre>
               <div className="mt-3 flex gap-2">
                 <button className="btn" disabled={!connected} onClick={() => void act(p.id, "sign")}>
                   Sign

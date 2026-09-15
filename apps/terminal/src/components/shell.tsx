@@ -77,6 +77,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <span className="num hidden md:inline text-[11px] text-[var(--mk-muted)] truncate max-w-[220px]">{programId}</span>
           <div className="ml-auto flex items-center gap-2 min-w-0">
             <ApiBanner />
+            <button
+              type="button"
+              className="btn btn-ghost h-9 px-3 text-[12px]"
+              onClick={() => window.dispatchEvent(new Event("markov:palette"))}
+              aria-label="Open command palette"
+            >
+              ⌘K
+            </button>
             <span className="hidden sm:inline text-[12px] text-[var(--mk-muted)] truncate">
               {connected && pk ? `${pk.slice(0, 4)}…${pk.slice(-4)}` : "read-only until connected"}
             </span>

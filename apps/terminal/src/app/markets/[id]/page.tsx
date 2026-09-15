@@ -57,6 +57,7 @@ export default function MarketWorkspace() {
   const [requestId, setRequestId] = useState<string | null>(null);
   const [state, setState] = useState<(typeof STATES)[number]>("IDLE");
   const [narrow, setNarrow] = useState(false);
+  const [reduceOnly, setReduceOnly] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1023px)");
@@ -131,7 +132,7 @@ export default function MarketWorkspace() {
       state?: string;
       approval_required?: boolean;
       signables?: Signable[];
-    }>("/trades/request", { method: "POST", body: JSON.stringify(body) });
+    }>(reduceOnly ? "/trades/reduce" : "/trades/request", { method: "POST", body: JSON.stringify(body) });
     setRequestId(res.request_id);
     setSignable(res.signables?.[0] ?? null);
     setMsg(`${res.decision} · ${res.reason} · ${res.request_id}`);
@@ -156,7 +157,7 @@ export default function MarketWorkspace() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-      <div className="grid gap-3">
+      <div className="grid gap-3 lg:order-none order-2">
         <div>
           <p className="chip" style={{ background: "white" }}>
             {id}
@@ -225,7 +226,7 @@ export default function MarketWorkspace() {
           </div>
         )}
       </div>
-      <aside className="clay p-4 lg:sticky lg:top-20 h-fit">
+      <aside className="clay p-4 lg:sticky lg:top-20 h-fit order-1 lg:order-none">
         <h2 className="font-semibold">Ticket</h2>
         <p className="text-[12px] text-[var(--mk-muted)] mt-1">
           Owner signs. Keys L / S flip side. Phoenix cannot execute.
@@ -253,7 +254,7 @@ export default function MarketWorkspace() {
         </label>
         <label className="mt-3 block text-[12px] text-[var(--mk-muted)]">
           Leverage (cap 2.0x)
-          <input className="mt-1 w-full clay px-3 py-2 num" value={leverage} onChange={(e) => setLeverage(e.target.value)} inputMode="decimal" />
+          <input className="mt-1 w-full clay px-3 py-2 num" value={leverage} onChange={(e) => setLeverage(e.target.value)} inputMode="decimal" disabled={reduceOnly} />
         </label>
         <label className="mt-3 block text-[12px] text-[var(--mk-muted)]">
           Venue
@@ -264,12 +265,16 @@ export default function MarketWorkspace() {
             <option value="phoenix">Phoenix (read-only)</option>
           </select>
         </label>
+        <label className="mt-3 flex items-center gap-2 text-[13px]">
+          <input type="checkbox" checked={reduceOnly} onChange={(e) => setReduceOnly(e.target.checked)} />
+          Reduce only
+        </label>
         <div className="mt-4 flex gap-2">
           <button className="btn btn-ghost flex-1" onClick={() => void simulate()}>
             Simulate
           </button>
           <button className="btn flex-1" disabled={!connected || phoenixPinned} onClick={() => void request()}>
-            Request
+            {reduceOnly ? "Reduce" : "Request"}
           </button>
         </div>
         {signable?.compact_json && (
