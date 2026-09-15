@@ -1,12 +1,9 @@
 node_modules/
-.project_id
-.github_repo
 .env
 .env.*
 .vercel/
 .output/
+.nitro/
 dist/
-.grok/*
-!.grok/app-env.json
-.vercel
-.env*
+test-results/
+playwright-report/

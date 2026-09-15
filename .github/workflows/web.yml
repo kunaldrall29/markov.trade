@@ -2,12 +2,13 @@ name: web
 on:
   push:
     branches: [main]
-    paths: ["apps/**", "packages/**", "package.json", "pnpm-workspace.yaml", "turbo.json"]
+    paths: ["apps/**", "packages/**", "docs/idl/**", "package.json", "pnpm-workspace.yaml", "pnpm-lock.yaml", "turbo.json", ".github/workflows/web.yml"]
   pull_request:
-    paths: ["apps/**", "packages/**", "package.json", "pnpm-workspace.yaml", "turbo.json"]
+    paths: ["apps/**", "packages/**", "docs/idl/**", "package.json", "pnpm-workspace.yaml", "pnpm-lock.yaml", "turbo.json", ".github/workflows/web.yml"]
 jobs:
   web:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -15,8 +16,36 @@ jobs:
           version: 9.15.9
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm -r typecheck
-      - run: pnpm -r build
+      - name: sdk — generated client matches the IDL snapshots
+        run: |
+          pnpm --filter @markov/sdk generate
+          git diff --exit-code -- packages/sdk/src/generated || (echo "::error::packages/sdk/src/generated is stale; run pnpm --filter @markov/sdk generate" && exit 1)
+      - name: sdk — FACTS drift, typecheck, tests (decoders vs program-crate bytes, PDAs vs devnet addresses)
+        run: |
+          pnpm --filter @markov/sdk facts:check
+          pnpm --filter @markov/sdk typecheck
+          pnpm --filter @markov/sdk test
+      - name: web — typecheck, lint, build
+        run: |
+          pnpm --filter @markov/web typecheck
+          pnpm --filter @markov/web lint
+          pnpm --filter @markov/web build
+      - name: web — fixture set and Playwright (fixture rpc, capture-mode test wallet)
+        run: |
+          pnpm --filter @markov/web exec vitest run tests/fixtures
+          pnpm --filter @markov/web exec playwright install --with-deps chromium
+          pnpm --filter @markov/web e2e
+      - name: web — Playwright read paths against real devnet (public endpoint; failures here are reported, not blocking)
+        continue-on-error: true
+        env:
+          E2E_RPC_URL: https://api.devnet.solana.com
+        run: pnpm --filter @markov/web exec playwright test --project=desktop desk.spec.ts activity.spec.ts labels-and-copy.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7

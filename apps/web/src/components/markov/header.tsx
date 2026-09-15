@@ -2,13 +2,15 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { ConnectButton } from "@/components/wallet/connect-button";
 import { Wordmark } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 
 const NAV = [
   { to: "/", label: "Home" },
   { to: "/book", label: "Desk" },
-  { to: "/receipts", label: "Receipts" },
+  { to: "/receipts", label: "Activity" },
+  { to: "/account", label: "Account" },
   { to: "/paper", label: "Paper" },
 ] as const;
 
@@ -32,7 +34,7 @@ export function Header() {
     <header className="sticky top-0 z-40 px-3 pt-3">
       <div
         className={cn(
-          "mx-auto flex max-w-6xl items-center justify-between gap-3 rounded-lg px-3 py-1.5 shadow-hairline backdrop-blur-md transition-[background-color,box-shadow] duration-200",
+          "mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-lg px-3 py-1.5 shadow-hairline backdrop-blur-md transition-[background-color,box-shadow] duration-200",
           scrolled ? "bg-surface/90" : "bg-surface/70",
         )}
       >
@@ -53,11 +55,12 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-0.5">
-          <span className="mr-1 hidden items-center gap-2 sm:flex">
+        <div className="flex items-center gap-1">
+          <span className="mr-1 hidden items-center gap-2 sm:flex" title="Solana devnet · test stage">
             <span className="live-dot size-1.5 rounded-full bg-allow" />
             <span className="font-mono text-micro text-muted">DEVNET</span>
           </span>
+          <ConnectButton />
           <ThemeToggle />
           <button
             type="button"
@@ -78,14 +81,14 @@ export function Header() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={cn(
-                  "flex min-h-11 items-center rounded-sm px-3 text-sm text-muted",
-                  pathname === item.to && "bg-raised text-fg",
-                )}
+                className={cn("flex min-h-11 items-center rounded-sm px-3 text-sm text-muted", pathname === item.to && "bg-raised text-fg")}
               >
                 {item.label}
               </Link>
             ))}
+            <p className="flex min-h-11 items-center gap-2 px-3 font-mono text-micro text-muted">
+              <span className="live-dot size-1.5 rounded-full bg-allow" /> DEVNET · TEST STAGE
+            </p>
           </nav>
         </div>
       ) : null}

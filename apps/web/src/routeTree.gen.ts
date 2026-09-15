@@ -10,13 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as BookRouteImport } from './routes/book'
 import { Route as PaperRouteImport } from './routes/paper'
 import { Route as ReceiptsRouteImport } from './routes/receipts'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiV1ReceiptsRouteImport } from './routes/api/v1/receipts'
+import { Route as ApiV1BookStatsRouteImport } from './routes/api/v1/book/stats'
+import { Route as ApiV1MandatesAddressRouteImport } from './routes/api/v1/mandates/$address'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BookRoute = BookRouteImport.update({
@@ -34,39 +44,107 @@ const ReceiptsRoute = ReceiptsRouteImport.update({
   path: '/receipts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1ReceiptsRoute = ApiV1ReceiptsRouteImport.update({
+  id: '/api/v1/receipts',
+  path: '/api/v1/receipts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1BookStatsRoute = ApiV1BookStatsRouteImport.update({
+  id: '/api/v1/book/stats',
+  path: '/api/v1/book/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1MandatesAddressRoute = ApiV1MandatesAddressRouteImport.update({
+  id: '/api/v1/mandates/$address',
+  path: '/api/v1/mandates/$address',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/book': typeof BookRoute
   '/paper': typeof PaperRoute
   '/receipts': typeof ReceiptsRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/v1/receipts': typeof ApiV1ReceiptsRoute
+  '/api/v1/book/stats': typeof ApiV1BookStatsRoute
+  '/api/v1/mandates/$address': typeof ApiV1MandatesAddressRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/book': typeof BookRoute
   '/paper': typeof PaperRoute
   '/receipts': typeof ReceiptsRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/v1/receipts': typeof ApiV1ReceiptsRoute
+  '/api/v1/book/stats': typeof ApiV1BookStatsRoute
+  '/api/v1/mandates/$address': typeof ApiV1MandatesAddressRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/book': typeof BookRoute
   '/paper': typeof PaperRoute
   '/receipts': typeof ReceiptsRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/v1/receipts': typeof ApiV1ReceiptsRoute
+  '/api/v1/book/stats': typeof ApiV1BookStatsRoute
+  '/api/v1/mandates/$address': typeof ApiV1MandatesAddressRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/book' | '/paper' | '/receipts'
+  fullPaths:
+    | '/'
+    | '/account'
+    | '/book'
+    | '/paper'
+    | '/receipts'
+    | '/api/health'
+    | '/api/v1/receipts'
+    | '/api/v1/book/stats'
+    | '/api/v1/mandates/$address'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/book' | '/paper' | '/receipts'
-  id: '__root__' | '/' | '/book' | '/paper' | '/receipts'
+  to:
+    | '/'
+    | '/account'
+    | '/book'
+    | '/paper'
+    | '/receipts'
+    | '/api/health'
+    | '/api/v1/receipts'
+    | '/api/v1/book/stats'
+    | '/api/v1/mandates/$address'
+  id:
+    | '__root__'
+    | '/'
+    | '/account'
+    | '/book'
+    | '/paper'
+    | '/receipts'
+    | '/api/health'
+    | '/api/v1/receipts'
+    | '/api/v1/book/stats'
+    | '/api/v1/mandates/$address'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRoute
   BookRoute: typeof BookRoute
   PaperRoute: typeof PaperRoute
   ReceiptsRoute: typeof ReceiptsRoute
+  ApiHealthRoute: typeof ApiHealthRoute
+  ApiV1ReceiptsRoute: typeof ApiV1ReceiptsRoute
+  ApiV1BookStatsRoute: typeof ApiV1BookStatsRoute
+  ApiV1MandatesAddressRoute: typeof ApiV1MandatesAddressRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -76,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/book': {
@@ -99,14 +184,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReceiptsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/receipts': {
+      id: '/api/v1/receipts'
+      path: '/api/v1/receipts'
+      fullPath: '/api/v1/receipts'
+      preLoaderRoute: typeof ApiV1ReceiptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/book/stats': {
+      id: '/api/v1/book/stats'
+      path: '/api/v1/book/stats'
+      fullPath: '/api/v1/book/stats'
+      preLoaderRoute: typeof ApiV1BookStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/mandates/$address': {
+      id: '/api/v1/mandates/$address'
+      path: '/api/v1/mandates/$address'
+      fullPath: '/api/v1/mandates/$address'
+      preLoaderRoute: typeof ApiV1MandatesAddressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRoute,
   BookRoute: BookRoute,
   PaperRoute: PaperRoute,
   ReceiptsRoute: ReceiptsRoute,
+  ApiHealthRoute: ApiHealthRoute,
+  ApiV1ReceiptsRoute: ApiV1ReceiptsRoute,
+  ApiV1BookStatsRoute: ApiV1BookStatsRoute,
+  ApiV1MandatesAddressRoute: ApiV1MandatesAddressRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Film } from "@/components/markov/film";
 import { TapeMarquee } from "@/components/markov/marquee";
 import { Reveal } from "@/components/markov/reveal";
@@ -8,7 +7,11 @@ import { CinematicReel } from "./reel";
 const FAQ = [
   {
     q: "Is this yield I can take home?",
-    a: "No. This is Solana devnet. Marks are marked PnL, not a promised rate. Unaudited. If a number cannot be checked from chain or the venue, it is not on this desk.",
+    a: "No. This is the test stage on Solana devnet. Marks are marked PnL, not a promised rate. Unaudited. If a number cannot be checked from chain or the venue, it is not on this desk.",
+  },
+  {
+    q: "What does Markov actually enforce?",
+    a: "Per-trade cap, daily cap, spend budgets, slippage bound, mark freshness, the venue and token allowlists, the action set and the expiry are checked by the program on chain before any venue call. Net delta, gross and the daily-loss halt are enforced by the agent's guard in this version and are labelled off-chain guard wherever they appear.",
   },
   {
     q: "Who can withdraw?",
@@ -20,11 +23,11 @@ const FAQ = [
   },
   {
     q: "Is the agent an LLM?",
-    a: "No. The book-core is deterministic and must run if every model is down. The risk guard is thresholds. A model may propose. An LLM never signs.",
+    a: "No. The house book's core is deterministic and must run if every model is down. The guard is thresholds. A model may propose through the same rules. An LLM never signs.",
   },
   {
-    q: "Where is the marketplace?",
-    a: "Not until the house book has a public curve. Book One is the only strategy on this page.",
+    q: "Can I connect my own bot or model?",
+    a: "The account is the product: one mandate, one operator key that may only propose, and receipts for every answer. In this stage the operator is the house agent; scoped keys for your own software are the next surface.",
   },
   {
     q: "What's the APY?",
@@ -33,20 +36,10 @@ const FAQ = [
 ];
 
 export function LandingPage() {
-  const [replay, setReplay] = useState(0);
-
-  function watchRefusal() {
-    setReplay((n) => n + 1);
-    document.getElementById("blotter")?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      block: "center",
-    });
-  }
-
   return (
     <>
       <CinematicReel />
-      <Hero onWatchRefusal={watchRefusal} replayNonce={replay} />
+      <Hero />
       <TapeMarquee />
 
       <section className="mx-auto max-w-6xl px-5 py-24 md:py-32">
@@ -55,7 +48,7 @@ export function LandingPage() {
         </Reveal>
         <div className="mt-6 space-y-2">
           {[
-            "I earn the book.",
+            "Your rules survive the model.",
             "They cannot take the pile.",
             "Every no is on the tape.",
           ].map((line, i) => (
@@ -74,7 +67,7 @@ export function LandingPage() {
             <p className="eyebrow">House book</p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">The room the book sits in.</h2>
             <p className="mt-4 max-w-md text-base leading-relaxed text-muted">
-              A house agent runs one bounded book on Solana perps. You park USDC. You keep withdraw. The operator cannot take the pile.
+              A house agent runs one bounded book against a mock perp venue on devnet. You fund a mandate. You keep withdraw. The operator cannot take the pile.
             </p>
           </Reveal>
         </div>
@@ -92,9 +85,9 @@ export function LandingPage() {
             </Reveal>
             <Reveal delay={80}>
               <p className="eyebrow">Job</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Idle USDC, no keys handed over.</h2>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Capital works, no keys handed over.</h2>
               <p className="mt-4 max-w-md text-base leading-relaxed text-muted">
-                Same job as the wrappers people already use. Someone good runs the book. You keep withdraw.
+                Software you already trust proposes the trades. The mandate decides what the capital may do. You keep withdraw.
               </p>
             </Reveal>
           </article>
@@ -142,9 +135,9 @@ export function LandingPage() {
         </Reveal>
         <div className="mt-10 grid gap-3 md:grid-cols-2">
           {[
-            ["01", "Core", "Inventory bands, hedge ratio, max gross, kill conditions. Runs if every model is dead."],
-            ["02", "Veto", "A model may propose. The guard may refuse. The refusal is a first-class event."],
-            ["03", "Sidecar", "Funding, OI, liquidations, basis. Features — never an order router."],
+            ["01", "Rules", "Per-trade cap, daily cap, slippage, mark freshness, allowlists, expiry. On chain, tighten-only."],
+            ["02", "Veto", "A model may propose. The program may refuse. The refusal is a receipt, not an error."],
+            ["03", "Guard", "Delta band, gross ceiling, daily-loss halt. Off-chain in this version, and labelled so."],
             ["04", "Proof", "If a number cannot be checked from chain or venue APIs, it is not on this desk."],
           ].map(([n, title, body], i) => (
             <Reveal key={n} delay={i * 70} as="article" className="rounded-md bg-surface p-5 shadow-hairline transition-shadow hover:shadow-hairline-strong">
@@ -195,9 +188,9 @@ export function LandingPage() {
             <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">Always able to leave.</h2>
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               {[
-                ["Fund", "USDC-d in the mandate PDA — never the operator."],
+                ["Fund", "USDC-d into the mandate's vault — never the operator's."],
                 ["Pause", "Owner-only unpause."],
-                ["Revoke", "Next intent refused. Receipt says Revoked."],
+                ["Revoke", "Next proposal refused. Receipt says Revoked."],
                 ["Withdraw", "On in every state. Coins to you."],
               ].map(([name, body]) => (
                 <div key={name}>

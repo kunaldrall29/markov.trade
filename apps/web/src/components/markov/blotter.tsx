@@ -1,140 +1,74 @@
-import { useEffect, useRef, useState } from "react";
-import { BOOK_STATS, OWNER_VERBS, rowLabel, SAMPLE_TAPE, type TapeRow } from "@/lib/tape";
-import { cn } from "@/lib/utils";
+/**
+ * The live blotter on the landing page: the house book's counters and its
+ * last receipts, from the same read API the Desk uses. There is no sample
+ * tape; when the chain cannot be read the blotter says so.
+ */
+import { Link } from "@tanstack/react-router";
+import { GATE_B_MANDATE, formatUnits } from "@markov/sdk";
+import { useBookStats, useReceiptFeed } from "@/lib/data/queries";
+import { ReceiptList } from "@/components/desk/receipt-list";
+import { CircuitChip } from "@/components/desk/circuit";
 import { Button } from "@/components/ui/button";
 
-function TapeLine({ row, animate }: { row: TapeRow; animate: boolean }) {
-  const label = rowLabel(row);
-  return (
-    <li
-      className={cn(
-        "grid grid-cols-[3rem_1fr_auto] items-center gap-2 px-4 py-2.5 font-mono text-xs tabular-nums md:grid-cols-[3rem_1fr_4.5rem_auto]",
-        animate && "tape-in",
-      )}
-    >
-      <span className="text-subtle">{row.t}</span>
-      <span className="truncate">{row.action}</span>
-      <span className="hidden text-right text-muted md:block">{row.qty}</span>
-      <span
-        className={cn(
-          "text-right text-micro font-medium uppercase",
-          row.result === "blocked" && "text-refuse",
-          row.result === "allowed" && "text-allow",
-          row.result === "skip" && "text-subtle",
-        )}
-      >
-        {label}
-      </span>
-    </li>
-  );
-}
-
-export function Blotter({
-  replayNonce = 0,
-  holdOnRefusal = false,
-}: {
-  replayNonce?: number;
-  holdOnRefusal?: boolean;
-}) {
-  const [shown, setShown] = useState(0);
-  const [note, setNote] = useState("withdraw stays on in every state · sample tape, devnet");
-  const reducedRef = useRef(false);
-
-  useEffect(() => {
-    reducedRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }, []);
-
-  useEffect(() => {
-    if (reducedRef.current) {
-      setShown(SAMPLE_TAPE.length);
-      return;
-    }
-    setShown(0);
-    let i = 0;
-    let hold = false;
-    const tick = () => {
-      i += 1;
-      setShown(i);
-      const last = SAMPLE_TAPE[i - 1];
-      if (holdOnRefusal && last?.result === "blocked") {
-        hold = true;
-        window.setTimeout(() => {
-          hold = false;
-        }, 1200);
-      }
-      return i < SAMPLE_TAPE.length;
-    };
-    tick();
-    const iv = window.setInterval(() => {
-      if (hold) return;
-      if (!tick()) window.clearInterval(iv);
-    }, holdOnRefusal ? 450 : 700);
-    return () => window.clearInterval(iv);
-  }, [replayNonce, holdOnRefusal]);
+export function Blotter({ limit = 8 }: { limit?: number }) {
+  const stats = useBookStats();
+  const feed = useReceiptFeed({ mandate: GATE_B_MANDATE, limit });
+  const s = stats.data;
+  const d = s?.mandate.vault.decimals ?? 6;
+  const pos = s?.position ?? null;
+  const gross = pos ? BigInt(pos.notional.raw) : 0n;
+  const net = pos ? (pos.side === "short" ? -gross : gross) : 0n;
+  const degraded = stats.isError || feed.isError;
 
   return (
-    <div className="relative overflow-hidden rounded-md bg-surface shadow-hairline">
+    <div className="relative overflow-hidden rounded-md bg-surface shadow-hairline" data-testid="blotter">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px overflow-hidden">
         <div className="scan-bar h-8 w-full bg-linear-to-b from-accent/40 to-transparent" />
       </div>
 
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
         <span className="flex items-center gap-2">
-          <span className="live-dot size-2 rounded-full bg-allow" />
+          <span className={`live-dot size-2 rounded-full ${degraded ? "bg-refuse" : "bg-allow"}`} />
           <span className="font-mono text-micro text-allow">BOOK_ONE</span>
         </span>
-        <span className="font-mono text-micro text-subtle">marked · not a rate</span>
+        <span className="font-mono text-micro text-subtle">{degraded ? "chain not readable" : s ? `live · slot ${s.data_slot}` : "reading…"}</span>
       </div>
 
       <dl className="grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
         <div className="bg-raised px-4 py-3">
           <dt className="font-mono text-nano uppercase tracking-wider text-subtle">net delta</dt>
-          <dd className="mt-1 font-mono text-xl tabular-nums">{BOOK_STATS.netDelta}</dd>
-          <p className="font-mono text-nano text-subtle">{BOOK_STATS.netBand}</p>
+          <dd className="mt-1 font-mono text-xl tabular-nums">{s ? formatUnits(net, d) : "—"}</dd>
+          <p className="font-mono text-nano text-subtle">{s ? `±${formatUnits(BigInt(s.offchain_limits.delta_band.raw), d, { min: 0 })} · off-chain guard` : ""}</p>
         </div>
         <div className="bg-raised px-4 py-3">
           <dt className="font-mono text-nano uppercase tracking-wider text-subtle">gross</dt>
-          <dd className="mt-1 font-mono text-xl tabular-nums">{BOOK_STATS.gross}</dd>
-          <p className="font-mono text-nano text-subtle">{BOOK_STATS.cap}</p>
+          <dd className="mt-1 font-mono text-xl tabular-nums">{s ? formatUnits(gross, d) : "—"}</dd>
+          <p className="font-mono text-nano text-subtle">{s ? `cap ${formatUnits(BigInt(s.offchain_limits.max_gross.raw), d, { min: 0 })} · off-chain guard` : ""}</p>
         </div>
         <div className="bg-raised px-4 py-3">
-          <dt className="font-mono text-nano uppercase tracking-wider text-subtle">funding 7d</dt>
-          <dd className="mt-1 font-mono text-xl tabular-nums">{BOOK_STATS.funding7d}</dd>
-          <p className="font-mono text-nano text-subtle">{BOOK_STATS.fundingUnit}</p>
+          <dt className="font-mono text-nano uppercase tracking-wider text-subtle">vault</dt>
+          <dd className="mt-1 font-mono text-xl tabular-nums">{s ? formatUnits(BigInt(s.mandate.vault.raw), d) : "—"}</dd>
+          <p className="font-mono text-nano text-subtle">USDC-d · chain</p>
         </div>
         <div className="bg-raised px-4 py-3">
           <dt className="font-mono text-nano uppercase tracking-wider text-subtle">refusals</dt>
-          <dd className="mt-1 font-mono text-xl tabular-nums text-refuse">{BOOK_STATS.refusals}</dd>
-          <p className="font-mono text-nano text-subtle">{BOOK_STATS.refusalsWindow}</p>
+          <dd className={`mt-1 font-mono text-xl tabular-nums ${s && s.window.refusals > 0 ? "text-refuse" : "text-subtle"}`}>{s ? s.window.refusals : "—"}</dd>
+          <p className="font-mono text-nano text-subtle">{s ? (s.window.refusals === 0 ? "none in 24h" : "24h") : ""}</p>
         </div>
       </dl>
 
-      <div className="flex items-center justify-between px-4 py-2 font-mono text-micro uppercase tracking-wider">
-        <span className="text-allow">circuit live</span>
-        <span className="text-subtle">skip = default</span>
+      {s ? <CircuitChip circuit={s.circuit} markAge={s.mark.pyth?.age_secs ?? null} /> : null}
+
+      <div className="border-t border-line">
+        <ReceiptList rows={feed.data?.receipts ?? []} empty={feed.isLoading ? "reading receipts…" : feed.isError ? "receipts could not be read" : "no receipts in this window"} maxHeight="max-h-56" />
       </div>
 
-      <ol className="max-h-64 overflow-auto border-t border-line" aria-live="polite">
-        {SAMPLE_TAPE.slice(0, shown).map((row, idx) => (
-          <TapeLine key={`${row.t}-${idx}`} row={row} animate={idx === shown - 1} />
-        ))}
-      </ol>
-
-      <div className="grid grid-cols-2 gap-2 border-t border-line p-3 sm:grid-cols-4">
-        {OWNER_VERBS.map((verb) => (
-          <Button
-            key={verb.id}
-            type="button"
-            size="sm"
-            variant={verb.id === "withdraw" ? "primary" : verb.id === "revoke" ? "kill" : verb.id === "pause" ? "quiet" : "ghost"}
-            className="w-full"
-            onClick={() => setNote(verb.body)}
-          >
-            {verb.label}
-          </Button>
-        ))}
+      <div className="flex items-center justify-between gap-2 border-t border-line p-3">
+        <p className="font-mono text-nano text-subtle">devnet · chain-read · every 5 s</p>
+        <Button asChild size="sm" variant="ghost">
+          <Link to="/book">Open the desk</Link>
+        </Button>
       </div>
-      <p className="px-3 pb-3 font-mono text-nano text-subtle">{note}</p>
     </div>
   );
 }

@@ -1,80 +1,103 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Film } from "@/components/markov/film";
-import { SiteShell } from "@/components/markov/site-shell";
-import { rowLabel, SAMPLE_TAPE, type TapeRow } from "@/lib/tape";
+import { BLOCK_REASON_NAMES, MANDATE_PROGRAM_ID, explorerAccount, short } from "@markov/sdk";
+import type { ReceiptRow } from "@/lib/api-types";
+import { useHealth, useReceiptFeed } from "@/lib/data/queries";
 import { cn } from "@/lib/utils";
+import { DegradedBanner } from "@/components/desk/degraded";
+import { ReceiptList } from "@/components/desk/receipt-list";
+import { SiteShell } from "@/components/markov/site-shell";
+import { StageLine } from "@/components/markov/stage";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/receipts")({ component: ReceiptsPage });
 
-type Filter = "all" | TapeRow["result"];
+type Filter = "all" | "allowed" | "refused" | "owner";
+
+function matches(row: ReceiptRow, filter: Filter, reason: string): boolean {
+  if (filter === "allowed" && row.kind !== "action") return false;
+  if (filter === "refused" && row.kind !== "refusal") return false;
+  if (filter === "owner" && row.kind !== "owner") return false;
+  if (reason && row.reason !== reason) return false;
+  return true;
+}
 
 function ReceiptsPage() {
   const [filter, setFilter] = useState<Filter>("all");
-  const rows = useMemo(
-    () => (filter === "all" ? SAMPLE_TAPE : SAMPLE_TAPE.filter((r) => r.result === filter)),
-    [filter],
-  );
+  const [reason, setReason] = useState("");
+  const [pages, setPages] = useState<string[]>([]);
+  const before = pages[pages.length - 1];
+  const feed = useReceiptFeed({ limit: 50, before });
+  const health = useHealth();
+  const rows = useMemo(() => (feed.data?.receipts ?? []).filter((r) => matches(r, filter, reason)), [feed.data, filter, reason]);
+  const failing = [feed.isError ? `receipts: ${feed.error?.message}` : null, health.data && !health.data.chainReady ? `rpc: ${health.data.rpc.error ?? health.data.failing.join(", ")}` : null].filter((x): x is string => !!x);
 
   return (
     <SiteShell>
       <section className="mx-auto max-w-6xl px-5 pb-8 pt-10">
-        <p className="eyebrow">Receipts</p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight md:text-6xl">The tape.</h1>
+        <StageLine />
+        <h1 className="mt-4 text-4xl font-semibold tracking-tight md:text-6xl">Activity.</h1>
         <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted">
-          Every fill and every refusal. Sample tape, devnet. A zero-refusal book is ordinary. The interesting row is the one that says no.
+          Every allow, every refusal and every owner action the program has emitted, decoded from inner-instruction data by IDL. Newest first. A zero-refusal book is ordinary; the interesting row is the one that says no.
+        </p>
+        <p className="mt-3 font-mono text-nano text-subtle">
+          program{" "}
+          <a href={explorerAccount(MANDATE_PROGRAM_ID)} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+            {short(MANDATE_PROGRAM_ID, 8, 8)}
+          </a>
+          {feed.data ? ` · slot ${feed.data.data_slot} · ${feed.data.signatures} signatures in this page` : ""}
         </p>
       </section>
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-5 pb-20 lg:grid-cols-[0.9fr_1.1fr]">
-        <Film
-          src="/images/tape.jpg"
-          alt="Thermal receipt tape with a red refusal stamp."
-          className="aspect-still rounded-md lg:aspect-auto lg:min-h-[28rem]"
-        />
-        <div>
-          <div className="mb-4 flex flex-wrap gap-2">
-            {(["all", "allowed", "blocked", "skip"] as const).map((id) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setFilter(id)}
-                className={cn(
-                  "min-h-10 rounded-sm px-3 font-mono text-micro uppercase tracking-eye",
-                  filter === id ? "bg-accent text-accent-fg" : "bg-raised text-muted hover:text-fg",
-                )}
-              >
-                {id}
-              </button>
-            ))}
+      <div className="mx-auto max-w-6xl px-5 pb-20">
+        {failing.length ? (
+          <div className="mb-4">
+            <DegradedBanner failing={failing} lastUpdated={feed.dataUpdatedAt || null} />
           </div>
-          <ol className="overflow-hidden rounded-md bg-surface shadow-hairline">
-            {rows.length === 0 ? (
-              <li className="px-4 py-6 font-mono text-sm text-subtle">no refusals in this window</li>
-            ) : (
-              rows.map((row, i) => (
-                <li
-                  key={`${row.t}-${i}`}
-                  className="grid grid-cols-[3rem_1fr_auto] items-center gap-2 border-b border-line px-4 py-3 font-mono text-xs last:border-b-0 md:grid-cols-[3rem_1fr_4.5rem_auto]"
-                >
-                  <span className="text-subtle">{row.t}</span>
-                  <span className="truncate">{row.action}</span>
-                  <span className="hidden text-right text-muted md:block">{row.qty}</span>
-                  <span
-                    className={cn(
-                      "text-right text-micro font-medium uppercase",
-                      row.result === "blocked" && "text-refuse",
-                      row.result === "allowed" && "text-allow",
-                      row.result === "skip" && "text-subtle",
-                    )}
-                  >
-                    {rowLabel(row)}
-                  </span>
-                </li>
-              ))
-            )}
-          </ol>
-          <p className="mt-3 font-mono text-nano text-subtle">sample tape, devnet · not a live feed</p>
+        ) : null}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {(["all", "allowed", "refused", "owner"] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setFilter(id)}
+              className={cn("min-h-10 rounded-sm px-3 font-mono text-micro uppercase tracking-eye", filter === id ? "bg-accent text-accent-fg" : "bg-raised text-muted hover:text-fg")}
+              data-testid={`filter-${id}`}
+            >
+              {id}
+            </button>
+          ))}
+          <select
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            aria-label="Filter by refusal reason"
+            className="min-h-10 rounded-sm bg-raised px-3 font-mono text-micro uppercase tracking-eye text-muted"
+          >
+            <option value="">any reason</option>
+            {BLOCK_REASON_NAMES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="overflow-hidden rounded-md bg-surface shadow-hairline">
+          <ReceiptList rows={rows} showMandate empty={feed.isLoading ? "reading receipts…" : feed.isError ? "receipts could not be read" : filter === "refused" ? "no refusals in this window" : "no receipts in this window"} />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="font-mono text-nano text-subtle">live feed · chain · refreshes every 5 s while visible · explorer links open on devnet</p>
+          <div className="flex gap-2">
+            {pages.length ? (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setPages((p) => p.slice(0, -1))}>
+                Newer
+              </Button>
+            ) : null}
+            {feed.data?.before && feed.data.signatures >= 50 ? (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setPages((p) => [...p, feed.data!.before!])} data-testid="older">
+                Older
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     </SiteShell>
