@@ -9,13 +9,13 @@ type Proposal = { id: string; kind: string; actor: string; status: string; creat
 
 export default function Approvals() {
   const { connected } = useWallet();
-  const [rows, setRows] = useState<Proposal[]>([]);
+  const [rows, setRows] = useState<Proposal[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   const load = () =>
     api<{ proposals: Proposal[] }>("/approvals")
-      .then((r) => setRows(r.proposals))
-      .catch(() => undefined);
+      .then((r) => setRows(r.proposals ?? []))
+      .catch((e: Error) => setMsg(e.message));
 
   useEffect(() => {
     load();
@@ -31,7 +31,9 @@ export default function Approvals() {
 
   return (
     <Page title="Approvals" note="MCP proposals land here. The model never receives a signable. Sign or decline; both are receipted.">
-      {rows.length === 0 ? (
+      {rows === null ? (
+        <div className="clay p-6 text-[14px] text-[var(--mk-muted)]">Loading…</div>
+      ) : rows.length === 0 ? (
         <div className="clay p-6 text-[14px] text-[var(--mk-muted)]">Inbox empty.</div>
       ) : (
         <ul className="grid gap-3">

@@ -20,6 +20,7 @@ test-ledger/
 coverage/
 .pglite/
 data/
+**/control-plane.json
 .playwright-mcp/
 
 # editor / os

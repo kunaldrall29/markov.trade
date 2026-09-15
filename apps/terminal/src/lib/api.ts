@@ -9,6 +9,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   };
   const token = getToken();
   if (token && !headers.authorization) headers.authorization = `Bearer ${token}`;
+  if (!init?.body) delete headers["content-type"];
   const res = await fetch(`${apiUrl}${path}`, {
     ...init,
     headers,
