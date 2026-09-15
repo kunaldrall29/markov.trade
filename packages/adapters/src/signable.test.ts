@@ -31,6 +31,22 @@ test("slippage is null when the book cannot fill", () => {
   assert.equal(bps, null);
 });
 
+test("cancel_order compact JSON is typed cancel_order with client_order_id", async () => {
+  const { buildPacificaCancelOrder } = await import("./pacifica.ts");
+  const o = buildPacificaCancelOrder({
+    account: "6ETnufiec2CxVWTS4u5Wiq33Zh5Y3Qm6Pkdpi375fuxP",
+    symbol: "SOL",
+    clientOrderId: "12345678-1234-1234-1234-123456789abc",
+    timestamp: 1748970123456,
+    expiryWindow: 5000,
+  });
+  const parsed = JSON.parse(o.compactJson);
+  assert.equal(parsed.type, "cancel_order");
+  assert.equal(parsed.data.symbol, "SOL");
+  assert.equal(parsed.data.client_order_id, "12345678-1234-1234-1234-123456789abc");
+  assert.deepEqual(Object.keys(parsed), ["data", "expiry_window", "timestamp", "type"]);
+});
+
 test("create_order amount is base size rounded to lot, not USD", async () => {
   const { buildPacificaCreateOrder } = await import("./pacifica.ts");
   const o = buildPacificaCreateOrder({

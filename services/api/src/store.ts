@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Receipt } from "@markov/sdk";
-import type { PacificaOrderFields } from "@markov/adapters";
+import type { PacificaCancelFields, PacificaOrderFields } from "@markov/adapters";
 
 export type Proposal = {
   id: string;
@@ -18,10 +18,11 @@ export type PendingTrade = {
   status: "REQUESTED" | "AWAITING_SIGNATURE" | "SUBMITTED" | "FAILED" | "REJECTED";
   actor: string;
   market: string;
+  op?: "create_order" | "cancel_order";
   compact_json: string | null;
   timestamp: number | null;
   expiry_window: number | null;
-  fields: PacificaOrderFields | null;
+  fields: PacificaOrderFields | PacificaCancelFields | null;
   venue_response?: unknown;
   created_at: string;
 };

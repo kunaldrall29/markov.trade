@@ -48,6 +48,7 @@ Retired: the Gate B “Markov Book” programs (`25CdYaZe…`, `3Zcd8Xs…`, `5o
 | PACIFICA_ACCOUNT | `GET /account?account=` — 404 `Account not found` if unregistered | 2026-09-15 | test-api |
 | PACIFICA_POSITIONS | `GET /positions?account=` — 200 `[]` if none | 2026-09-15 | test-api |
 | PACIFICA_ORDERS_CREATE | `POST /orders/create` signed compact JSON (`create_order`) | 2026-09-15 | docs.pacifica.fi create-limit-order |
+| PACIFICA_ORDERS_CANCEL | `POST /orders/cancel` signed compact JSON (`cancel_order`); `symbol` plus `order_id` or `client_order_id` | 2026-09-15 | docs.pacifica.fi cancel-order |
 | PACIFICA_MIN_ORDER | `min_order_size` is `"10"` on SOL/BTC/ETH/DOGE testnet. Same number across lot sizes; treated as **USD notional**, not base size, until Pacifica docs say otherwise. | 2026-09-15 | `/info` |
 | PACIFICA_SOL_MARK | 100.324 USD, ts 1789461043710, funding −0.00000358 | 2026-09-15 | `/info/prices` |
 | PACIFICA_OVERLAP | SOL, BTC, ETH, DOGE, FARTCOIN, PUMP present on Pacifica mainnet | 2026-09-15 | `/info` symbol set |

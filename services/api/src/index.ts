@@ -21,10 +21,12 @@ import { persist } from "./store.ts";
 import { getAccountExecutable } from "./chain.ts";
 import {
   buildPacificaCreateOrder,
+  buildPacificaCancelOrder,
   jupiterQuote,
   pacificaAccount,
   pacificaKlines,
   pacificaPositions,
+  submitPacificaCancel,
   submitPacificaOrder,
   type PacificaOrderFields,
 } from "@markov/adapters";
@@ -247,6 +249,13 @@ export async function buildServer() {
     return routesFor(cache, body.market, body.notional_usd, body.horizon_hours ?? 24);
   });
 
+  app.post("/routes/quote", async (req) => {
+    const body = req.body as { market: string; notional_usd: number; horizon_hours?: number };
+    const compared = routesFor(cache, body.market, body.notional_usd, body.horizon_hours ?? 24);
+    const selected = compared.routes.find((r) => r.selected) ?? compared.routes[0] ?? null;
+    return { env: env.name, market: body.market, selected, note: compared.note };
+  });
+
   app.post("/risk/simulate-trade", async (req) => {
     const body = req.body as { market: string; notional_usd: number; leverage: number; venue?: string };
     const preview = await freshPreview(cache, body);
@@ -368,6 +377,7 @@ export async function buildServer() {
       status: "AWAITING_SIGNATURE",
       actor,
       market: body.market,
+      op: "create_order",
       compact_json,
       timestamp,
       expiry_window,
@@ -470,6 +480,7 @@ export async function buildServer() {
       status: "AWAITING_SIGNATURE",
       actor: session.pubkey,
       market: body.market,
+      op: "create_order",
       compact_json: built.compactJson,
       timestamp: built.timestamp,
       expiry_window: built.expiry_window,
@@ -494,9 +505,84 @@ export async function buildServer() {
     };
   });
 
+  app.post("/positions/reduce", async (req, reply) => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/trades/reduce",
+      headers: { authorization: req.headers.authorization ?? "" },
+      payload: (req.body ?? {}) as Record<string, unknown>,
+    });
+    return reply.code(res.statusCode).send(res.json());
+  });
   app.post("/trades/confirm-signature", async (req, reply) => confirmAndSubmit(req, reply, cache, env.name));
   app.post("/trades/submit", async (req, reply) => confirmAndSubmit(req, reply, cache, env.name));
 
+  app.post("/orders/cancel", async (req, reply) => {
+    const session = sessionOf(req, cache);
+    if (!session) return reply.code(401).send({ error: "SIWS required" });
+    const body = req.body as { market: string; client_order_id?: string; request_id?: string };
+    const clientOrderId = body.client_order_id ?? body.request_id;
+    if (!body?.market || !clientOrderId) {
+      return reply.code(400).send({ error: "market and client_order_id required" });
+    }
+    const built = buildPacificaCancelOrder({
+      account: session.pubkey,
+      symbol: body.market.replace("-PERP", ""),
+      clientOrderId,
+    });
+    const request_id = randomUUID();
+    const receipt = recordReceipt(cache, {
+      request_id,
+      actor: session.pubkey,
+      kind: "OrderCancel",
+      decision: "REQUIRE_APPROVAL",
+      reason_code: REASON.EXECUTION_CONFIRMED,
+      reason: "REQUIRE_APPROVAL",
+      mandate_version: activeMandate(cache, session.pubkey).version,
+      invest_mandate_version: 0,
+      data_slot: 0,
+      venue_id: 1,
+      market_id: body.market,
+      checks: [],
+      tx_signature: null,
+    });
+    cache.pending.unshift({
+      request_id,
+      status: "AWAITING_SIGNATURE",
+      actor: session.pubkey,
+      market: body.market,
+      op: "cancel_order",
+      compact_json: built.compactJson,
+      timestamp: built.timestamp,
+      expiry_window: built.expiry_window,
+      fields: built.fields,
+      created_at: receipt.created_at,
+    });
+    persist(cache);
+    return {
+      request_id,
+      receipt_id: receipt.request_id,
+      state: "AWAITING_SIGNATURE",
+      decision: "REQUIRE_APPROVAL",
+      signables: [
+        {
+          kind: "pacifica_message",
+          display: `cancel_order ${body.market} ${clientOrderId}`,
+          compact_json: built.compactJson,
+          fields: built.fields,
+          note: "Owner signs cancel_order. Pacifica returns Order not found if nothing is live.",
+        },
+      ],
+    };
+  });
+
+  app.get("/trades/:id/status", async (req, reply) => {
+    const id = (req.params as { id: string }).id;
+    const pending = cache.pending.find((p) => p.request_id === id);
+    const receipt = cache.receipts.find((r) => r.request_id === id);
+    if (!pending && !receipt) return reply.code(404).send({ error: "not found" });
+    return { env: env.name, pending: pending ?? null, receipt: receipt ?? null };
+  });
   app.get("/trades/:id", async (req, reply) => {
     const id = (req.params as { id: string }).id;
     const pending = cache.pending.find((p) => p.request_id === id);
@@ -505,7 +591,14 @@ export async function buildServer() {
     return { env: env.name, pending: pending ?? null, receipt: receipt ?? null };
   });
 
-  app.get("/receipts", async () => ({ env: env.name, receipts: cache.receipts }));
+  app.get("/receipts", async (req) => {
+    const q = req.query as { decision?: string; kind?: string; market?: string };
+    let receipts = cache.receipts;
+    if (q.decision) receipts = receipts.filter((r) => r.decision === q.decision);
+    if (q.kind) receipts = receipts.filter((r) => r.kind === q.kind);
+    if (q.market) receipts = receipts.filter((r) => r.market_id === q.market);
+    return { env: env.name, receipts };
+  });
   app.get("/receipts/:id", async (req, reply) => {
     const id = (req.params as { id: string }).id;
     const receipt = cache.receipts.find((r) => r.request_id === id);
@@ -589,6 +682,11 @@ export async function buildServer() {
       note: "No linked venue equity; leverage is null, not zero.",
     };
   });
+  app.get("/risk/history", async () => ({
+    env: env.name,
+    points: [],
+    note: "No equity series until a venue account exists.",
+  }));
 
   app.get("/mandate", async (req) => {
     const session = sessionOf(req, cache);
@@ -693,6 +791,33 @@ export async function buildServer() {
     return { ok: true, receipt_id: receipt.request_id, note: "Pause is owner-signed on chain once the program is deployed." };
   });
 
+  app.post("/mandate/unpause", async (req, reply) => {
+    const session = sessionOf(req, cache);
+    if (!session) return reply.code(401).send({ error: "SIWS required" });
+    const receipt = recordReceipt(cache, {
+      request_id: randomUUID(),
+      actor: session.pubkey,
+      kind: "MandateUnpause",
+      decision: "REQUIRE_APPROVAL",
+      reason_code: REASON.EXECUTION_CONFIRMED,
+      reason: "REQUIRE_APPROVAL",
+      mandate_version: activeMandate(cache, session.pubkey).version,
+      invest_mandate_version: 0,
+      data_slot: 0,
+      venue_id: 0,
+      market_id: "UNPAUSE",
+      checks: [],
+      tx_signature: null,
+    });
+    return { ok: true, receipt_id: receipt.request_id, note: "Unpause is owner-signed on chain once the program is deployed." };
+  });
+
+  app.get("/mandate/versions", async (req) => {
+    const session = sessionOf(req, cache);
+    const versions = session ? cache.mandates.filter((m) => m.owner === session.pubkey) : [];
+    return { env: env.name, versions, note: "Off-chain drafts only until the program is deployed." };
+  });
+
   app.get("/invest/rules", async (req) => {
     const session = sessionOf(req, cache);
     const rules = session ? cache.investRules.filter((r) => r.owner === session.pubkey) : [];
@@ -702,6 +827,13 @@ export async function buildServer() {
       assets: XSTOCKS,
       note: "No on-chain invest mandate until the owner signs one. xStocks exist on mainnet only.",
     };
+  });
+  app.get("/invest/rules/:id", async (req, reply) => {
+    const id = (req.params as { id: string }).id;
+    const rule = cache.investRules.find((r) => String(r.id) === id);
+    if (!rule) return reply.code(404).send({ error: "not found" });
+    const history = cache.receipts.filter((r) => r.request_id === id || r.market_id === id);
+    return { env: env.name, rule, history, note: "On-chain invest mandate version is 0 until the program is deployed." };
   });
   app.get("/invest/history", async () => ({ env: env.name, receipts: cache.receipts.filter((r) => r.kind.startsWith("Invest")) }));
   app.post("/invest/quote", async (req) => {
@@ -840,6 +972,22 @@ export async function buildServer() {
     return { ok: true, id, status: "declined" };
   });
 
+  app.post("/venues/:venue/link", async (req, reply) => {
+    const venue = (req.params as { venue: string }).venue;
+    if (venue !== "pacifica") {
+      return reply.code(400).send({
+        error: venue === "phoenix" ? "Phoenix is INTEGRATED · read-only" : "Drift link is owner-signed initialize+deposit once RPC+SDK subscribe is live",
+      });
+    }
+    const res = await app.inject({
+      method: "POST",
+      url: "/venues/pacifica/bind",
+      headers: { authorization: req.headers.authorization ?? "" },
+      payload: {},
+    });
+    return reply.code(res.statusCode).send(res.json());
+  });
+
   app.get("/alerts", async () => ({ env: env.name, alerts: [] }));
   app.get("/mcp/tools", async () => ({
     env: env.name,
@@ -891,6 +1039,16 @@ export async function buildServer() {
     cache.sessions.set(token, { pubkey, exp: Date.now() + 15 * 60_000 });
     cache.sessions.set(refresh, { pubkey, exp: Date.now() + 7 * 24 * 3600_000 });
     return { token, refresh, pubkey, env: env.name };
+  });
+
+  app.post("/auth/refresh", async (req, reply) => {
+    const { refresh } = req.body as { refresh?: string };
+    if (!refresh) return reply.code(400).send({ error: "refresh required" });
+    const row = cache.sessions.get(refresh);
+    if (!row || row.exp < Date.now()) return reply.code(401).send({ error: "bad refresh" });
+    const token = randomBytes(24).toString("hex");
+    cache.sessions.set(token, { pubkey: row.pubkey, exp: Date.now() + 15 * 60_000 });
+    return { token, pubkey: row.pubkey, env: env.name };
   });
 
   app.get("/auth/me", async (req, reply) => {
@@ -947,13 +1105,23 @@ async function confirmAndSubmit(
   const pacEnv = envName === "devnet" ? "testnet" : "mainnet";
   let submitted: { status: number; body: unknown };
   try {
-    submitted = await submitPacificaOrder(pacEnv, {
-      account: session.pubkey,
-      signature: body.signature,
-      timestamp: pending.timestamp,
-      expiry_window: pending.expiry_window,
-      fields: pending.fields,
-    });
+    if (pending.op === "cancel_order") {
+      submitted = await submitPacificaCancel(pacEnv, {
+        account: session.pubkey,
+        signature: body.signature,
+        timestamp: pending.timestamp,
+        expiry_window: pending.expiry_window,
+        fields: pending.fields as { symbol: string; client_order_id: string },
+      });
+    } else {
+      submitted = await submitPacificaOrder(pacEnv, {
+        account: session.pubkey,
+        signature: body.signature,
+        timestamp: pending.timestamp,
+        expiry_window: pending.expiry_window,
+        fields: pending.fields as PacificaOrderFields,
+      });
+    }
   } catch (err) {
     submitted = { status: 0, body: { error: String(err) } };
   }

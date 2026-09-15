@@ -18,10 +18,12 @@ export {
   pacificaPositions,
   buildPacificaSignable,
   buildPacificaCreateOrder,
+  buildPacificaCancelOrder,
   submitPacificaOrder,
+  submitPacificaCancel,
   roundToStep,
 } from "./pacifica.ts";
-export type { PacificaCandle, PacificaOrderFields } from "./pacifica.ts";
+export type { PacificaCandle, PacificaOrderFields, PacificaCancelFields } from "./pacifica.ts";
 export { phoenixMarkets, phoenixBook, phoenixState, phoenixStateFromParts, phoenixCapabilities } from "./phoenix.ts";
 export { jupiterQuote, jupiterToken, jupiterCapabilities } from "./jupiter.ts";
 export { driftCapabilities } from "./drift.ts";

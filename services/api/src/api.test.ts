@@ -290,3 +290,60 @@ test("risk and portfolio leave leverage null when equity is unknown", async () =
   assert.equal((port.json() as { equity: null }).equity, null);
   await app.close();
 });
+
+test("cancel_order requires SIWS and types the compact JSON", async () => {
+  const { app } = await buildServer();
+  const denied = await app.inject({
+    method: "POST",
+    url: "/orders/cancel",
+    payload: { market: "SOL-PERP", client_order_id: "12345678-1234-1234-1234-123456789abc" },
+  });
+  assert.equal(denied.statusCode, 401);
+  const s = await siws(app);
+  const res = await app.inject({
+    method: "POST",
+    url: "/orders/cancel",
+    headers: s.headers,
+    payload: { market: "SOL-PERP", client_order_id: "12345678-1234-1234-1234-123456789abc" },
+  });
+  assert.equal(res.statusCode, 200);
+  const body = res.json() as { signables: Array<{ compact_json: string; fields: { symbol: string } }> };
+  const parsed = JSON.parse(body.signables[0].compact_json);
+  assert.equal(parsed.type, "cancel_order");
+  assert.equal(body.signables[0].fields.symbol, "SOL");
+  await app.close();
+});
+
+test("auth refresh mints a new access token", async () => {
+  const { app } = await buildServer();
+  const kp = nacl.sign.keyPair();
+  const pubkey = bs58.encode(kp.publicKey);
+  const ch = await app.inject({ method: "POST", url: "/auth/challenge", payload: { pubkey } });
+  const { nonce, message } = ch.json() as { nonce: string; message: string };
+  const signature = bs58.encode(nacl.sign.detached(new TextEncoder().encode(message), kp.secretKey));
+  const v = await app.inject({ method: "POST", url: "/auth/verify", payload: { pubkey, signature, nonce } });
+  const { refresh } = v.json() as { refresh: string };
+  const r = await app.inject({ method: "POST", url: "/auth/refresh", payload: { refresh } });
+  assert.equal(r.statusCode, 200);
+  const { token } = r.json() as { token: string };
+  const me = await app.inject({ method: "GET", url: "/auth/me", headers: { authorization: `Bearer ${token}` } });
+  assert.equal(me.statusCode, 200);
+  await app.close();
+});
+
+test("receipts filter by decision", async () => {
+  const { app } = await buildServer();
+  await app.inject({
+    method: "POST",
+    url: "/invest/propose",
+    payload: { mint: "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh", usd_per_period: 5, period_seconds: 604800 },
+  });
+  const all = await app.inject({ method: "GET", url: "/receipts" });
+  const filtered = await app.inject({ method: "GET", url: "/receipts?decision=REQUIRE_APPROVAL" });
+  assert.equal((all.json() as { receipts: unknown[] }).receipts.length >= 1, true);
+  assert.equal(
+    (filtered.json() as { receipts: Array<{ decision: string }> }).receipts.every((r) => r.decision === "REQUIRE_APPROVAL"),
+    true,
+  );
+  await app.close();
+});

@@ -294,17 +294,18 @@ export function buildPacificaCreateOrder(input: {
   return { ...signed, fields, timestamp, expiry_window };
 }
 
-export async function submitPacificaOrder(
+export async function submitPacificaSigned(
   env: "mainnet" | "testnet",
+  path: "/orders/create" | "/orders/cancel",
   input: {
     account: string;
     signature: string;
     timestamp: number;
     expiry_window: number;
-    fields: PacificaOrderFields;
+    fields: Record<string, unknown>;
   },
 ): Promise<{ status: number; body: unknown }> {
-  const url = `${pacificaBase(env)}/orders/create`;
+  const url = `${pacificaBase(env)}${path}`;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 12_000);
   try {
@@ -335,4 +336,58 @@ export async function submitPacificaOrder(
   } finally {
     clearTimeout(t);
   }
+}
+
+export async function submitPacificaOrder(
+  env: "mainnet" | "testnet",
+  input: {
+    account: string;
+    signature: string;
+    timestamp: number;
+    expiry_window: number;
+    fields: PacificaOrderFields;
+  },
+): Promise<{ status: number; body: unknown }> {
+  return submitPacificaSigned(env, "/orders/create", input);
+}
+
+export type PacificaCancelFields = { symbol: string; client_order_id: string };
+
+export function buildPacificaCancelOrder(input: {
+  account: string;
+  symbol: string;
+  clientOrderId: string;
+  timestamp?: number;
+  expiryWindow?: number;
+}): {
+  compactJson: string;
+  display: string;
+  fields: PacificaCancelFields;
+  timestamp: number;
+  expiry_window: number;
+} {
+  const fields: PacificaCancelFields = { symbol: input.symbol, client_order_id: input.clientOrderId };
+  const timestamp = input.timestamp ?? Date.now();
+  const expiry_window = input.expiryWindow ?? 30_000;
+  const signed = buildPacificaSignable({
+    type: "cancel_order",
+    account: input.account,
+    timestamp,
+    expiry_window,
+    data: fields,
+  });
+  return { ...signed, fields, timestamp, expiry_window };
+}
+
+export async function submitPacificaCancel(
+  env: "mainnet" | "testnet",
+  input: {
+    account: string;
+    signature: string;
+    timestamp: number;
+    expiry_window: number;
+    fields: PacificaCancelFields;
+  },
+): Promise<{ status: number; body: unknown }> {
+  return submitPacificaSigned(env, "/orders/cancel", input);
 }
