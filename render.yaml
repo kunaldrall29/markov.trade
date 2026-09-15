@@ -1,0 +1,53 @@
+# Render Blueprint — control plane + Terminal + landing
+# Bind HTTP to 0.0.0.0:$PORT. Disk is ephemeral unless attached.
+
+services:
+  - type: web
+    name: markov-api
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: corepack enable && pnpm install --frozen-lockfile=false
+    startCommand: MARKOV_ENV=devnet HOST=0.0.0.0 pnpm --filter @markov/api start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: MARKOV_ENV
+        value: devnet
+      - key: SIWS_DOMAIN
+        sync: false
+
+  - type: web
+    name: markov-terminal
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: corepack enable && pnpm install --frozen-lockfile=false && pnpm --filter @markov/terminal build
+    startCommand: HOST=0.0.0.0 pnpm --filter @markov/terminal start
+    healthCheckPath: /overview
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_ENV
+        value: devnet
+      - key: NEXT_PUBLIC_CLUSTER
+        value: devnet
+      - key: API_INTERNAL_URL
+        sync: false
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
+
+  - type: web
+    name: markov-landing
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: corepack enable && pnpm install --frozen-lockfile=false && pnpm --filter @markov/landing build
+    startCommand: HOST=0.0.0.0 pnpm --filter @markov/landing start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_ENV
+        value: devnet

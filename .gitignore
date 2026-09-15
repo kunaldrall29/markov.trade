@@ -19,6 +19,8 @@ test-ledger/
 *.so
 coverage/
 .pglite/
+data/
+.playwright-mcp/
 
 # editor / os
 .DS_Store

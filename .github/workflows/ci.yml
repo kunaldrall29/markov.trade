@@ -24,6 +24,7 @@ jobs:
       - run: pnpm --filter @markov/adapters test
       - run: pnpm --filter @markov/config test
       - run: pnpm --filter @markov/api test
+      - run: pnpm --filter @markov/api typecheck
       - run: pnpm --filter @markov/keeper test
       - run: pnpm --filter @markov/mcp test
       - run: node scripts/check-claims.mjs
