@@ -12,5 +12,6 @@
 | ADR-008 | A venue refusal must be data, not a program error (P04) | Accepted 2026-09-02 |
 | ADR-009 | A CPI carries the mandate's signature to the venue's own CPIs (P04) | Accepted 2026-09-03 |
 | ADR-010 | How the Terminal reads the chain until the Rust read plane is hosted | Accepted 2026-09-15 |
+| ADR-011 | The control-plane program is a successor, built beside `markov_mandate`, deployed only from a networked box | Accepted 2026-09-15 |
 
 Numbering note: the pack's prompts refer to "ADR-001 recording the Rust-services decision" and "ADR-013 house MarkAccount fallback"; here those are ADR-005 and ADR-003 respectively.

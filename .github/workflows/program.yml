@@ -25,9 +25,11 @@ jobs:
           mkdir -p target/deploy
           solana-keygen new --no-bip39-passphrase --silent --outfile target/deploy/markov_mandate-keypair.json
           solana-keygen new --no-bip39-passphrase --silent --outfile target/deploy/demo_perps-keypair.json
+          solana-keygen new --no-bip39-passphrase --silent --outfile target/deploy/markov-keypair.json
+          solana-keygen new --no-bip39-passphrase --silent --outfile target/deploy/test_noop-keypair.json
       - name: anchor build (SBF) — ignore the keypair/declare_id check in CI
         run: anchor build --ignore-keys
-      - name: LiteSVM suite
-        run: cargo test -p markov_mandate -p demo_perps
+      - name: LiteSVM suites (mandate, venue, control-plane invariants)
+        run: cargo test -p markov_mandate -p demo_perps -p markov
       - name: IDL append-only check (BlockReason)
         run: bash scripts/idl-append-only.sh || echo "::warning::idl-append-only.sh is a P14 deliverable; skipped"

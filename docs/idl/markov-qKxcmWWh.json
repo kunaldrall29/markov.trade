@@ -1,0 +1,2357 @@
+{
+  "address": "qKxcmWWh5zLcm9jWExhH4Cm5eGmS3w5f1BhkUb6NsXs",
+  "metadata": {
+    "name": "markov",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Markov control-plane program: account, versioned mandates, permissions, receipts (01_Program_Build_Prompt)."
+  },
+  "instructions": [
+    {
+      "name": "close_receipt",
+      "docs": [
+        "Rent back to the owner once a receipt is 30 days old; the event remains."
+      ],
+      "discriminator": [
+        126,
+        254,
+        244,
+        203,
+        124,
+        164,
+        134,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "account"
+        },
+        {
+          "name": "receipt",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_account",
+      "discriminator": [
+        99,
+        20,
+        130,
+        119,
+        196,
+        235,
+        131,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "account",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "execution_mode",
+          "type": {
+            "defined": {
+              "name": "ExecutionMode"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "finalize_decision",
+      "docs": [
+        "Instruction *i+2*: the post-state hash after the venue leg. Adds two",
+        "fields once and nothing else (invariant 8)."
+      ],
+      "discriminator": [
+        205,
+        130,
+        118,
+        192,
+        122,
+        171,
+        224,
+        122
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "account"
+        },
+        {
+          "name": "receipt",
+          "writable": true
+        },
+        {
+          "name": "instructions"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "post_state_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "tx_signature_hint",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "caps",
+          "type": {
+            "defined": {
+              "name": "GlobalCaps"
+            }
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "invest_execute",
+      "docs": [
+        "The keeper's Allow path for Invest. Validates the invest mandate from",
+        "the chain (the reserve floor from the owner's token account, not a",
+        "supplied number), charges the month, writes the receipt, and requires",
+        "the delegation `collect` at *i+1* and the swap at *i+2*."
+      ],
+      "discriminator": [
+        216,
+        26,
+        123,
+        226,
+        145,
+        239,
+        119,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "account"
+        },
+        {
+          "name": "invest_mandate",
+          "writable": true
+        },
+        {
+          "name": "permission",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "reserve_token_account",
+          "docs": [
+            "The owner's USDC account; its balance *is* the reserve proof."
+          ]
+        },
+        {
+          "name": "receipt",
+          "writable": true
+        },
+        {
+          "name": "instructions"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InvestArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "link_venue",
+      "discriminator": [
+        122,
+        206,
+        172,
+        11,
+        111,
+        151,
+        130,
+        201
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "account",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "venue_id",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [
+        211,
+        22,
+        221,
+        251,
+        74,
+        121,
+        193,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "account",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "pause_invest",
+      "discriminator": [
+        217,
+        145,
+        109,
+        148,
+        12,
+        42,
+        144,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "account"
+        },
+        {
+          "name": "invest_mandate",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "record_decision",
+      "docs": [
+        "Instruction *i*. Validates the decision against the chain, writes the",
+        "receipt and the ledger, and requires the venue instruction at *i+1*",
+        "for an Allow (or forbids one for anything else)."
+      ],
+      "discriminator": [
+        13,
+        153,
+        150,
+        233,
+        19,
+        198,
+        102,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "docs": [
+            "The owner, or an actor with a permission on this account."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "account",
+          "writable": true
+        },
+        {
+          "name": "mandate"
+        },
+        {
+          "name": "permission",
+          "docs": [
+            "Required for a non-owner signer; ignored for the owner."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "receipt",
+          "writable": true
+        },
+        {
+          "name": "ledger",
+          "writable": true
+        },
+        {
+          "name": "instructions"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "DecisionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "record_skip",
+      "docs": [
+        "An Invest cycle that did not execute: the receipt says why, and no",
+        "venue instruction may follow."
+      ],
+      "discriminator": [
+        191,
+        195,
+        54,
+        206,
+        22,
+        192,
+        124,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "account"
+        },
+        {
+          "name": "permission",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "receipt",
+          "writable": true
+        },
+        {
+          "name": "instructions"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "SkipArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "revoke_permission",
+      "discriminator": [
+        116,
+        82,
+        33,
+        181,
+        121,
+        144,
+        249,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "account"
+        },
+        {
+          "name": "permission",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_global_caps",
+      "discriminator": [
+        131,
+        18,
+        76,
+        223,
+        58,
+        117,
+        194,
+        117
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "caps",
+          "type": {
+            "defined": {
+              "name": "GlobalCaps"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_global_pause",
+      "docs": [
+        "Emergency stop for actor (keeper, MCP, API-key) flows. Owner-signed",
+        "flows keep working (`01` \u00a73)."
+      ],
+      "discriminator": [
+        32,
+        234,
+        28,
+        216,
+        67,
+        76,
+        116,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_invest_mandate",
+      "discriminator": [
+        239,
+        75,
+        249,
+        38,
+        49,
+        116,
+        28,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "account",
+          "writable": true
+        },
+        {
+          "name": "invest_mandate",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "version",
+          "type": "u32"
+        },
+        {
+          "name": "fields",
+          "type": {
+            "defined": {
+              "name": "InvestMandateFields"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_invest_programs",
+      "discriminator": [
+        170,
+        0,
+        179,
+        247,
+        117,
+        11,
+        163,
+        218
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "collect",
+          "type": "pubkey"
+        },
+        {
+          "name": "swap",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_mandate",
+      "discriminator": [
+        5,
+        53,
+        128,
+        29,
+        183,
+        240,
+        169,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "account",
+          "writable": true
+        },
+        {
+          "name": "mandate",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "version",
+          "type": "u32"
+        },
+        {
+          "name": "fields",
+          "type": {
+            "defined": {
+              "name": "MandateFields"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_permission",
+      "discriminator": [
+        70,
+        126,
+        41,
+        194,
+        245,
+        189,
+        128,
+        8
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "account"
+        },
+        {
+          "name": "permission",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "actor",
+          "type": "pubkey"
+        },
+        {
+          "name": "kind",
+          "type": {
+            "defined": {
+              "name": "ActorKind"
+            }
+          }
+        },
+        {
+          "name": "scopes",
+          "type": "u32"
+        },
+        {
+          "name": "per_action_cap_usd",
+          "type": "u64"
+        },
+        {
+          "name": "daily_cap_usd",
+          "type": "u64"
+        },
+        {
+          "name": "expires_slot",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_venue_program",
+      "docs": [
+        "The zero pubkey (the system program's id) means \"unset\"; it can never",
+        "be a venue, and neither can this program."
+      ],
+      "discriminator": [
+        12,
+        170,
+        92,
+        95,
+        47,
+        174,
+        224,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "venue_id",
+          "type": "u8"
+        },
+        {
+          "name": "program",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [
+        169,
+        144,
+        4,
+        38,
+        10,
+        141,
+        188,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "account",
+          "writable": true
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ActionReceipt",
+      "discriminator": [
+        52,
+        35,
+        16,
+        111,
+        195,
+        40,
+        16,
+        69
+      ]
+    },
+    {
+      "name": "DailyLedger",
+      "discriminator": [
+        95,
+        228,
+        160,
+        207,
+        107,
+        154,
+        16,
+        232
+      ]
+    },
+    {
+      "name": "GlobalConfig",
+      "discriminator": [
+        149,
+        8,
+        156,
+        202,
+        160,
+        252,
+        176,
+        217
+      ]
+    },
+    {
+      "name": "InvestMandate",
+      "discriminator": [
+        229,
+        183,
+        154,
+        194,
+        52,
+        143,
+        73,
+        128
+      ]
+    },
+    {
+      "name": "Mandate",
+      "discriminator": [
+        113,
+        216,
+        98,
+        159,
+        185,
+        63,
+        55,
+        18
+      ]
+    },
+    {
+      "name": "MarkovAccount",
+      "discriminator": [
+        17,
+        168,
+        214,
+        94,
+        176,
+        146,
+        252,
+        224
+      ]
+    },
+    {
+      "name": "Permission",
+      "discriminator": [
+        224,
+        83,
+        28,
+        79,
+        10,
+        253,
+        161,
+        28
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "AccountStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Paused"
+          },
+          {
+            "name": "Closed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ActionReceipt",
+      "docs": [
+        "`[\"receipt\", account, request_id_le]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "request_id",
+            "type": "u128"
+          },
+          {
+            "name": "actor",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "ReceiptKind"
+              }
+            }
+          },
+          {
+            "name": "decision",
+            "type": {
+              "defined": {
+                "name": "Decision"
+              }
+            }
+          },
+          {
+            "name": "reason_code",
+            "type": "u16"
+          },
+          {
+            "name": "mandate_version",
+            "type": "u32"
+          },
+          {
+            "name": "invest_mandate_version",
+            "type": "u32"
+          },
+          {
+            "name": "data_slot",
+            "type": "u64"
+          },
+          {
+            "name": "venue_id",
+            "type": "u8"
+          },
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "checks",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Check"
+                }
+              }
+            }
+          },
+          {
+            "name": "route_snapshot_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "tx_signature_hint",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "pre_state_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "post_state_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "created_slot",
+            "type": "u64"
+          },
+          {
+            "name": "created_ts",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ActorKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Owner"
+          },
+          {
+            "name": "Keeper"
+          },
+          {
+            "name": "McpClient"
+          },
+          {
+            "name": "ApiKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Check",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "rule",
+            "type": "u8"
+          },
+          {
+            "name": "observed",
+            "type": "i64"
+          },
+          {
+            "name": "limit",
+            "type": "i64"
+          },
+          {
+            "name": "pass",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DailyLedger",
+      "docs": [
+        "`[\"day\", account, day_epoch_le]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "day_epoch",
+            "type": "i64"
+          },
+          {
+            "name": "realized_loss_usd",
+            "type": "u64"
+          },
+          {
+            "name": "gross_notional_usd",
+            "type": "u64"
+          },
+          {
+            "name": "actions_count",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Decision",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Allow"
+          },
+          {
+            "name": "Reject"
+          },
+          {
+            "name": "RequireApproval"
+          },
+          {
+            "name": "Skip"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DecisionArgs",
+      "docs": [
+        "What `record_decision` is handed. Every observed value comes from the",
+        "caller; every limit is taken from the chain (see `checks`)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request_id",
+            "type": "u128"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "ReceiptKind"
+              }
+            }
+          },
+          {
+            "name": "decision",
+            "type": {
+              "defined": {
+                "name": "Decision"
+              }
+            }
+          },
+          {
+            "name": "reason_code",
+            "type": "u16"
+          },
+          {
+            "name": "checks",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Check"
+                }
+              }
+            }
+          },
+          {
+            "name": "data_slot",
+            "type": "u64"
+          },
+          {
+            "name": "venue_id",
+            "type": "u8"
+          },
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "route_snapshot_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "pre_state_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "notional_usd",
+            "docs": [
+              "Projected notional of this action, micro-USD; charged to actor and",
+              "ledger caps on Allow."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "day_epoch",
+            "docs": [
+              "The UTC day this decision is charged to; must equal the clock's day."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExecutionMode",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "OwnerSigned"
+          },
+          {
+            "name": "KeeperWithinCap"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GlobalCaps",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "per_account_gross_notional_usd",
+            "docs": [
+              "Per-account gross perp notional, micro-USD (conventions \u00a77: $2,000)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "per_position_leverage_bps",
+            "docs": [
+              "Per-position leverage ceiling, bps (2.0x = 20_000)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "global_daily_invest_spend_usd",
+            "docs": [
+              "Global daily Invest keeper spend, micro-USD ($2,000)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "invest_min_per_execution_usd",
+            "docs": [
+              "Per-execution Invest size bounds, micro-USD ($5\u2013$100)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "invest_max_per_execution_usd",
+            "type": "u64"
+          },
+          {
+            "name": "freshness_slots",
+            "docs": [
+              "Market data older than this many slots is stale (rule 7)."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GlobalConfig",
+      "docs": [
+        "`[\"config\"]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "caps",
+            "type": {
+              "defined": {
+                "name": "GlobalCaps"
+              }
+            }
+          },
+          {
+            "name": "fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "venue_programs",
+            "docs": [
+              "Venue program ids by `venue_id` (index). Zero = unset."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "invest_collect_program",
+            "docs": [
+              "The spend-delegation program and the swap program an Invest execution",
+              "must be followed by, in that order."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "invest_swap_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_mint",
+            "docs": [
+              "The settlement mint an Invest reserve proof must be denominated in."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "invest_day_epoch",
+            "type": "i64"
+          },
+          {
+            "name": "invest_spent_today_usd",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InvestArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request_id",
+            "type": "u128"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_amount",
+            "type": "u64"
+          },
+          {
+            "name": "quote_cost_bps",
+            "type": "u16"
+          },
+          {
+            "name": "official_price",
+            "docs": [
+              "Official reference and quote prices, micro-USD per unit; 0 = none."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "quote_price",
+            "type": "u64"
+          },
+          {
+            "name": "market_status",
+            "type": {
+              "defined": {
+                "name": "MarketStatus"
+              }
+            }
+          },
+          {
+            "name": "checks",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Check"
+                }
+              }
+            }
+          },
+          {
+            "name": "data_slot",
+            "type": "u64"
+          },
+          {
+            "name": "route_snapshot_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "pre_state_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InvestExecutionMode",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "AlwaysOn"
+          },
+          {
+            "name": "ReferenceSafe"
+          },
+          {
+            "name": "MarketHoursOnly"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InvestMandate",
+      "docs": [
+        "`[\"invest\", account, version_le]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "allowlist",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "per_period_budget_usd",
+            "type": "u64"
+          },
+          {
+            "name": "period_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "monthly_ceiling_usd",
+            "type": "u64"
+          },
+          {
+            "name": "reserve_floor_usd",
+            "type": "u64"
+          },
+          {
+            "name": "max_cost_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_reference_deviation_bps",
+            "docs": [
+              "Off-hours deviation from the official reference tolerated in",
+              "ReferenceSafe mode, bps."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "single_asset_cap_bps",
+            "type": "u16"
+          },
+          {
+            "name": "execution_mode",
+            "type": {
+              "defined": {
+                "name": "InvestExecutionMode"
+              }
+            }
+          },
+          {
+            "name": "window_start_utc",
+            "docs": [
+              "Seconds after 00:00 UTC."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "window_end_utc",
+            "type": "u32"
+          },
+          {
+            "name": "days_mask",
+            "docs": [
+              "Bit 0 = Monday \u2026 bit 6 = Sunday."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "spent_this_month_usd",
+            "type": "u64"
+          },
+          {
+            "name": "month_epoch",
+            "docs": [
+              "`year * 12 + month` of the current spend window."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "activated_slot",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InvestMandateFields",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "allowlist",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "per_period_budget_usd",
+            "type": "u64"
+          },
+          {
+            "name": "period_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "monthly_ceiling_usd",
+            "type": "u64"
+          },
+          {
+            "name": "reserve_floor_usd",
+            "type": "u64"
+          },
+          {
+            "name": "max_cost_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_reference_deviation_bps",
+            "type": "u16"
+          },
+          {
+            "name": "single_asset_cap_bps",
+            "type": "u16"
+          },
+          {
+            "name": "execution_mode",
+            "type": {
+              "defined": {
+                "name": "InvestExecutionMode"
+              }
+            }
+          },
+          {
+            "name": "window_start_utc",
+            "type": "u32"
+          },
+          {
+            "name": "window_end_utc",
+            "type": "u32"
+          },
+          {
+            "name": "days_mask",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Mandate",
+      "docs": [
+        "`[\"mandate\", account, version_le]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "hash",
+            "docs": [
+              "sha256 of the canonical encoding of the fields below."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "max_leverage_bps",
+            "type": "u32"
+          },
+          {
+            "name": "max_notional_usd",
+            "type": "u64"
+          },
+          {
+            "name": "min_safety_buffer_bps",
+            "type": "u32"
+          },
+          {
+            "name": "max_daily_loss_usd",
+            "type": "u64"
+          },
+          {
+            "name": "approved_markets",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  16
+                ]
+              }
+            }
+          },
+          {
+            "name": "tier_caps_bps",
+            "docs": [
+              "Leverage ceilings by risk tier 0..5, bps."
+            ],
+            "type": {
+              "array": [
+                "u32",
+                5
+              ]
+            }
+          },
+          {
+            "name": "allowed_venues",
+            "docs": [
+              "Bit `venue_id` set when the venue may execute for this mandate."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "activated_slot",
+            "type": "u64"
+          },
+          {
+            "name": "activated_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MandateFields",
+      "docs": [
+        "The fields an owner signs for `set_mandate`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_leverage_bps",
+            "type": "u32"
+          },
+          {
+            "name": "max_notional_usd",
+            "type": "u64"
+          },
+          {
+            "name": "min_safety_buffer_bps",
+            "type": "u32"
+          },
+          {
+            "name": "max_daily_loss_usd",
+            "type": "u64"
+          },
+          {
+            "name": "approved_markets",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  16
+                ]
+              }
+            }
+          },
+          {
+            "name": "tier_caps_bps",
+            "type": {
+              "array": [
+                "u32",
+                5
+              ]
+            }
+          },
+          {
+            "name": "allowed_venues",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketStatus",
+      "docs": [
+        "Official-price market status as supplied by the keeper for Invest checks."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Closed"
+          },
+          {
+            "name": "Halted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarkovAccount",
+      "docs": [
+        "`[\"account\", owner]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "execution_mode",
+            "type": {
+              "defined": {
+                "name": "ExecutionMode"
+              }
+            }
+          },
+          {
+            "name": "active_mandate_version",
+            "type": "u32"
+          },
+          {
+            "name": "active_invest_mandate_version",
+            "type": "u32"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "AccountStatus"
+              }
+            }
+          },
+          {
+            "name": "replay_domain",
+            "docs": [
+              "Domain for request ids; bumps never, reserved for a future re-key."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "linked_venues",
+            "docs": [
+              "Bit `venue_id` set once the owner linked that venue."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "created_slot",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Permission",
+      "docs": [
+        "`[\"perm\", account, actor]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "actor",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "ActorKind"
+              }
+            }
+          },
+          {
+            "name": "scopes",
+            "type": "u32"
+          },
+          {
+            "name": "per_action_cap_usd",
+            "type": "u64"
+          },
+          {
+            "name": "daily_cap_usd",
+            "type": "u64"
+          },
+          {
+            "name": "spent_today_usd",
+            "type": "u64"
+          },
+          {
+            "name": "day_epoch",
+            "type": "i64"
+          },
+          {
+            "name": "expires_slot",
+            "type": "u64"
+          },
+          {
+            "name": "revoked",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReceiptEmitted",
+      "type": {
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "request_id",
+            "type": "u128"
+          },
+          {
+            "name": "actor",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "ReceiptKind"
+              }
+            }
+          },
+          {
+            "name": "decision",
+            "type": {
+              "defined": {
+                "name": "Decision"
+              }
+            }
+          },
+          {
+            "name": "reason_code",
+            "type": "u16"
+          },
+          {
+            "name": "mandate_version",
+            "type": "u32"
+          },
+          {
+            "name": "invest_mandate_version",
+            "type": "u32"
+          },
+          {
+            "name": "data_slot",
+            "type": "u64"
+          },
+          {
+            "name": "venue_id",
+            "type": "u8"
+          },
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "checks",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Check"
+                }
+              }
+            }
+          },
+          {
+            "name": "route_snapshot_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "pre_state_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_slot",
+            "type": "u64"
+          },
+          {
+            "name": "created_ts",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "name": "ReceiptFinalized",
+      "type": {
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "request_id",
+            "type": "u128"
+          },
+          {
+            "name": "post_state_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "tx_signature_hint",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "name": "ReceiptKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "TradeOpen"
+          },
+          {
+            "name": "TradeReduce"
+          },
+          {
+            "name": "TradeClose"
+          },
+          {
+            "name": "InvestExecute"
+          },
+          {
+            "name": "InvestSkip"
+          },
+          {
+            "name": "MandateSet"
+          },
+          {
+            "name": "MandatePause"
+          },
+          {
+            "name": "PermissionSet"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SkipArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request_id",
+            "type": "u128"
+          },
+          {
+            "name": "reason_code",
+            "type": "u16"
+          },
+          {
+            "name": "checks",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Check"
+                }
+              }
+            }
+          },
+          {
+            "name": "data_slot",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "NotAdmin",
+      "msg": "global config: caller is not the admin"
+    },
+    {
+      "code": 6001,
+      "name": "NotOwner",
+      "msg": "account: caller is not the owner"
+    },
+    {
+      "code": 6002,
+      "name": "AccountClosed",
+      "msg": "account is closed"
+    },
+    {
+      "code": 6003,
+      "name": "BadMandateVersion",
+      "msg": "mandate version must be exactly active_version + 1"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidMandate",
+      "msg": "mandate field out of range"
+    },
+    {
+      "code": 6005,
+      "name": "TooManyMarkets",
+      "msg": "too many approved markets (max 32)"
+    },
+    {
+      "code": 6006,
+      "name": "TooManyMints",
+      "msg": "too many allowlisted mints (max 16)"
+    },
+    {
+      "code": 6007,
+      "name": "TooManyChecks",
+      "msg": "too many checks on a receipt (max 12)"
+    },
+    {
+      "code": 6008,
+      "name": "NoPermission",
+      "msg": "permission: actor has no grant for this account"
+    },
+    {
+      "code": 6009,
+      "name": "PermissionRevoked",
+      "msg": "permission: revoked"
+    },
+    {
+      "code": 6010,
+      "name": "PermissionExpired",
+      "msg": "permission: expired"
+    },
+    {
+      "code": 6011,
+      "name": "ScopeDenied",
+      "msg": "permission: scope not granted"
+    },
+    {
+      "code": 6012,
+      "name": "ActorCapExceeded",
+      "msg": "permission: per-action cap exceeded"
+    },
+    {
+      "code": 6013,
+      "name": "ActorDailyCapExceeded",
+      "msg": "permission: daily cap exceeded"
+    },
+    {
+      "code": 6014,
+      "name": "AllowViolatesMandate",
+      "msg": "an Allow decision was supplied whose observed values violate the active mandate"
+    },
+    {
+      "code": 6015,
+      "name": "AllowWhilePaused",
+      "msg": "an Allow decision was supplied while the account or the program is paused"
+    },
+    {
+      "code": 6016,
+      "name": "WrongDecisionKind",
+      "msg": "decision kind does not fit this instruction"
+    },
+    {
+      "code": 6017,
+      "name": "BadInstructionIndex",
+      "msg": "instructions sysvar: this instruction is not where the flow requires it"
+    },
+    {
+      "code": 6018,
+      "name": "MissingAdjacentInstruction",
+      "msg": "instructions sysvar: the adjacent instruction is missing"
+    },
+    {
+      "code": 6019,
+      "name": "AdjacentProgramNotAllowed",
+      "msg": "instructions sysvar: the adjacent instruction is not from an allowed program"
+    },
+    {
+      "code": 6020,
+      "name": "AdjacentIsSelf",
+      "msg": "instructions sysvar: the adjacent instruction must not be this program"
+    },
+    {
+      "code": 6021,
+      "name": "RejectFollowedByVenue",
+      "msg": "a Reject or Skip receipt must not be followed by a venue instruction"
+    },
+    {
+      "code": 6022,
+      "name": "UnknownVenue",
+      "msg": "venue id is not configured"
+    },
+    {
+      "code": 6023,
+      "name": "AlreadyFinalized",
+      "msg": "receipt already finalized"
+    },
+    {
+      "code": 6024,
+      "name": "ReceiptTooYoung",
+      "msg": "receipt is not old enough to close (30 days)"
+    },
+    {
+      "code": 6025,
+      "name": "NoActiveMandate",
+      "msg": "mandate not active for this account"
+    },
+    {
+      "code": 6026,
+      "name": "NoActiveInvestMandate",
+      "msg": "invest mandate not active for this account"
+    },
+    {
+      "code": 6027,
+      "name": "ChecksMismatch",
+      "msg": "supplied checks do not match what the program recomputed"
+    },
+    {
+      "code": 6028,
+      "name": "Math",
+      "msg": "arithmetic overflow"
+    },
+    {
+      "code": 6029,
+      "name": "WrongReserveAccount",
+      "msg": "reserve token account does not belong to the owner or has the wrong mint"
+    },
+    {
+      "code": 6030,
+      "name": "ReferenceRequired",
+      "msg": "invest: execution mode requires an official price reference"
+    },
+    {
+      "code": 6031,
+      "name": "InvestAmountOutOfBounds",
+      "msg": "invest amount outside the per-execution bounds"
+    },
+    {
+      "code": 6032,
+      "name": "WrongDayEpoch",
+      "msg": "day_epoch must be the clock's UTC day"
+    }
+  ],
+  "events": [
+    {
+      "discriminator": [
+        14,
+        151,
+        82,
+        185,
+        87,
+        185,
+        15,
+        150
+      ],
+      "name": "ReceiptEmitted"
+    },
+    {
+      "discriminator": [
+        78,
+        111,
+        25,
+        158,
+        198,
+        5,
+        208,
+        9
+      ],
+      "name": "ReceiptFinalized"
+    }
+  ]
+}

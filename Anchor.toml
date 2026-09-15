@@ -14,16 +14,21 @@ skip-lint = false
 [programs.devnet]
 markov_mandate = "25CdYaZeB18QvUR7cTyZPgTZPNREb7t6xL8zmk1eXAU6"
 demo_perps = "3Zcd8XsFWBTVku5GxQjwEBC7sLrJhF8vadyTnTr56hxB"
+# Successor control-plane program (01_Program_Build_Prompt). Placeholder id:
+# not deployed; the deploying box runs `anchor keys sync` and records the real
+# id in FACTS before the first devnet deploy.
+markov = "qKxcmWWh5zLcm9jWExhH4Cm5eGmS3w5f1BhkUb6NsXs"
 
 [programs.localnet]
 markov_mandate = "25CdYaZeB18QvUR7cTyZPgTZPNREb7t6xL8zmk1eXAU6"
 demo_perps = "3Zcd8XsFWBTVku5GxQjwEBC7sLrJhF8vadyTnTr56hxB"
+markov = "qKxcmWWh5zLcm9jWExhH4Cm5eGmS3w5f1BhkUb6NsXs"
 
 [provider]
 cluster = "devnet"
 wallet = "keys/deployer.json"
 
 [scripts]
-test = "cargo test -p markov_mandate -p demo_perps"
+test = "cargo test -p markov_mandate -p demo_perps -p markov"
 
 [hooks]

@@ -14,11 +14,14 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
-      # The two Anchor programs need the SBF build (program.yml); their LiteSVM
-      # tests include_bytes! the built .so, so they are excluded here.
-      - run: cargo clippy --workspace --all-targets --exclude markov_mandate --exclude demo_perps -- -D warnings
-      - run: cargo build --workspace --exclude markov_mandate --exclude demo_perps
-      - run: cargo test --workspace --exclude markov_mandate --exclude demo_perps
+      # The Anchor programs need the SBF build (program.yml); their LiteSVM
+      # tests include_bytes! the built .so, so they are excluded here. The
+      # control-plane program's pure checks (unit + proptest) run here.
+      - run: cargo clippy --workspace --all-targets --exclude markov_mandate --exclude demo_perps --exclude markov --exclude test_noop -- -D warnings
+      - run: cargo clippy -p markov -p test_noop --lib -- -D warnings
+      - run: cargo build --workspace --exclude markov_mandate --exclude demo_perps --exclude markov --exclude test_noop
+      - run: cargo test --workspace --exclude markov_mandate --exclude demo_perps --exclude markov --exclude test_noop
+      - run: cargo test -p markov --lib
       - name: cargo-deny and cargo-audit
         run: |
           cargo install cargo-deny cargo-audit --locked
