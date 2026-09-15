@@ -73,6 +73,9 @@ export function phoenixStateFromParts(
     makerFeeBps: m.makerFee * 10_000,
     maxLeverage: m.leverageTiers?.[0]?.maxLeverage ?? null,
     isolatedOnly: m.isolatedOnly,
+    tickSize: null,
+    lotSize: null,
+    minOrderSize: null,
   };
 }
 

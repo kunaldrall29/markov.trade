@@ -54,6 +54,9 @@ export type MarketStateDto = {
   data_slot: number | null;
   bids?: Array<{ price: number; size: number }>;
   asks?: Array<{ price: number; size: number }>;
+  tick_size?: number | null;
+  lot_size?: number | null;
+  min_order_size?: number | null;
 };
 
 export type VenueCapabilities = {

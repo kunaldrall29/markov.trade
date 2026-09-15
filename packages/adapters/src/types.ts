@@ -19,6 +19,9 @@ export type MarketState = {
   makerFeeBps: number | null;
   maxLeverage: number | null;
   isolatedOnly: boolean | null;
+  tickSize: number | null;
+  lotSize: number | null;
+  minOrderSize: number | null;
 };
 
 export type AdapterCapabilities = {

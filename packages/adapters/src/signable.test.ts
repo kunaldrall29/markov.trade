@@ -30,3 +30,27 @@ test("slippage is null when the book cannot fill", () => {
   const bps = slippageBpsAtNotional([{ price: 100, size: 0.01 }], 10_000);
   assert.equal(bps, null);
 });
+
+test("create_order amount is base size rounded to lot, not USD", async () => {
+  const { buildPacificaCreateOrder } = await import("./pacifica.ts");
+  const o = buildPacificaCreateOrder({
+    account: "6ETnufiec2CxVWTS4u5Wiq33Zh5Y3Qm6Pkdpi375fuxP",
+    symbol: "SOL",
+    side: "long",
+    notionalUsd: 50,
+    mark: 100,
+    tickSize: 0.01,
+    lotSize: 0.01,
+    bestBid: 99.99,
+    bestAsk: 100.01,
+    clientOrderId: "12345678-1234-1234-1234-123456789abc",
+    timestamp: 1748970123456,
+    expiryWindow: 5000,
+  });
+  assert.equal(o.fields.amount, "0.50");
+  assert.equal(o.fields.side, "bid");
+  assert.equal(o.fields.price, "100.01");
+  const parsed = JSON.parse(o.compactJson);
+  assert.equal(parsed.data.amount, "0.50");
+  assert.deepEqual(Object.keys(parsed), ["data", "expiry_window", "timestamp", "type"]);
+});

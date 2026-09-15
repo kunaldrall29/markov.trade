@@ -100,6 +100,9 @@ export function pacificaStateFromParts(
     makerFeeBps: 1.5,
     maxLeverage: info?.max_leverage ?? null,
     isolatedOnly: info?.isolated_only ?? null,
+    tickSize: info ? Number(info.tick_size) : null,
+    lotSize: info ? Number(info.lot_size) : null,
+    minOrderSize: info ? Number(info.min_order_size) : null,
   };
 }
 
@@ -145,4 +148,191 @@ function sortKeys(value: unknown): unknown {
     return out;
   }
   return value;
+}
+
+export type PacificaCandle = {
+  openTime: number;
+  closeTime: number;
+  symbol: string;
+  interval: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  trades: number;
+};
+
+export async function pacificaKlines(
+  symbol: string,
+  env: "mainnet" | "testnet" = "mainnet",
+  interval = "1h",
+  hours = 48,
+): Promise<PacificaCandle[]> {
+  const end = Date.now();
+  const start = end - hours * 3_600_000;
+  const body = await getJson<{
+    success: boolean;
+    data: Array<{ t: number; T: number; s: string; i: string; o: string; c: string; h: string; l: string; v: string; n: number }>;
+  }>(
+    `${pacificaBase(env)}/kline?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&start_time=${start}&end_time=${end}`,
+  );
+  if (!body.success) throw new Error("pacifica /kline unsuccessful");
+  return (body.data ?? []).map((k) => ({
+    openTime: k.t,
+    closeTime: k.T,
+    symbol: k.s,
+    interval: k.i,
+    open: Number(k.o),
+    high: Number(k.h),
+    low: Number(k.l),
+    close: Number(k.c),
+    volume: Number(k.v),
+    trades: k.n,
+  }));
+}
+
+export async function pacificaAccount(
+  account: string,
+  env: "mainnet" | "testnet" = "mainnet",
+): Promise<{ found: boolean; status: number; raw: unknown }> {
+  const url = `${pacificaBase(env)}/account?account=${encodeURIComponent(account)}`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8_000);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { accept: "application/json", "user-agent": "markov-adapters/0.1" },
+    });
+    const raw = await res.json();
+    const found = res.ok && (raw as { success?: boolean }).success !== false;
+    return { found, status: res.status, raw };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+export async function pacificaPositions(account: string, env: "mainnet" | "testnet" = "mainnet"): Promise<unknown[]> {
+  const body = await getJson<{ success: boolean; data: unknown[] }>(
+    `${pacificaBase(env)}/positions?account=${encodeURIComponent(account)}`,
+  );
+  return body.success ? (body.data ?? []) : [];
+}
+
+export type PacificaOrderFields = {
+  symbol: string;
+  price: string;
+  amount: string;
+  side: "bid" | "ask";
+  tif: "IOC" | "GTC";
+  reduce_only: boolean;
+  client_order_id: string;
+};
+
+export function roundToStep(value: number, step: number, mode: "floor" | "ceil"): number {
+  if (!(step > 0) || !Number.isFinite(value)) return value;
+  const n = mode === "floor" ? Math.floor(value / step + 1e-12) * step : Math.ceil(value / step - 1e-12) * step;
+  const decimals = (step.toString().split(".")[1] ?? "").length;
+  return Number(n.toFixed(decimals));
+}
+
+export function formatStep(value: number, step: number): string {
+  const decimals = (step.toString().split(".")[1] ?? "").length;
+  return value.toFixed(decimals);
+}
+
+export function buildPacificaCreateOrder(input: {
+  account: string;
+  symbol: string;
+  side: "long" | "short";
+  notionalUsd: number;
+  mark: number;
+  tickSize: number;
+  lotSize: number;
+  bestBid: number | null;
+  bestAsk: number | null;
+  tif?: "IOC" | "GTC";
+  reduceOnly?: boolean;
+  clientOrderId: string;
+  timestamp?: number;
+  expiryWindow?: number;
+}): {
+  compactJson: string;
+  display: string;
+  fields: PacificaOrderFields;
+  timestamp: number;
+  expiry_window: number;
+} {
+  const tif = input.tif ?? "IOC";
+  const side = input.side === "long" ? "bid" : "ask";
+  const pxRaw = input.side === "long" ? (input.bestAsk ?? input.mark) : (input.bestBid ?? input.mark);
+  const tick = input.tickSize || 0.01;
+  const lot = input.lotSize || 0.01;
+  const priceN = roundToStep(pxRaw, tick, input.side === "long" ? "ceil" : "floor");
+  const amountN = roundToStep(input.notionalUsd / input.mark, lot, "floor");
+  if (!(amountN > 0) || !(priceN > 0) || !(input.mark > 0)) {
+    throw new Error("order size or price rounds to zero");
+  }
+  const fields: PacificaOrderFields = {
+    symbol: input.symbol,
+    price: formatStep(priceN, tick),
+    amount: formatStep(amountN, lot),
+    side,
+    tif,
+    reduce_only: Boolean(input.reduceOnly),
+    client_order_id: input.clientOrderId,
+  };
+  const timestamp = input.timestamp ?? Date.now();
+  const expiry_window = input.expiryWindow ?? 30_000;
+  const signed = buildPacificaSignable({
+    type: "create_order",
+    account: input.account,
+    timestamp,
+    expiry_window,
+    data: fields,
+  });
+  return { ...signed, fields, timestamp, expiry_window };
+}
+
+export async function submitPacificaOrder(
+  env: "mainnet" | "testnet",
+  input: {
+    account: string;
+    signature: string;
+    timestamp: number;
+    expiry_window: number;
+    fields: PacificaOrderFields;
+  },
+): Promise<{ status: number; body: unknown }> {
+  const url = `${pacificaBase(env)}/orders/create`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 12_000);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+        "user-agent": "markov-adapters/0.1",
+      },
+      body: JSON.stringify({
+        account: input.account,
+        signature: input.signature,
+        timestamp: input.timestamp,
+        expiry_window: input.expiry_window,
+        ...input.fields,
+      }),
+    });
+    const text = await res.text();
+    let body: unknown = text;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      /* venue sometimes returns plain text */
+    }
+    return { status: res.status, body };
+  } finally {
+    clearTimeout(t);
+  }
 }
