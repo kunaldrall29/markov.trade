@@ -40,8 +40,10 @@ export function Stat({ label, value, note, tone }: { label: string; value: React
   return (
     <div className="bg-raised px-4 py-3">
       <dt className="font-mono text-nano uppercase tracking-wider text-subtle">{label}</dt>
-      <dd className={cn("mt-1 font-mono text-xl tabular-nums", tone === "allow" && "text-allow", tone === "refuse" && "text-refuse", tone === "muted" && "text-subtle")}>{value}</dd>
-      {note ? <p className="mt-0.5 font-mono text-nano text-subtle">{note}</p> : null}
+      <dd className={cn("mt-1 font-mono text-xl tabular-nums", tone === "allow" && "text-allow", tone === "refuse" && "text-refuse", tone === "muted" && "text-subtle")}>
+        {value}
+        {note ? <span className="mt-0.5 block font-mono text-nano font-normal text-subtle">{note}</span> : null}
+      </dd>
     </div>
   );
 }

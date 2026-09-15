@@ -25,7 +25,7 @@ function BookPage() {
     <SiteShell>
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 opacity-40">
-          <Film src="/images/hero-desk.jpg" alt="" className="h-full min-h-[24rem]" imgClassName="ken" />
+          <Film src="/images/hero-desk.jpg" alt="" className="h-full min-h-[24rem]" imgClassName="ken" priority />
         </div>
         <div className="absolute inset-0 bg-linear-to-b from-bg/40 via-bg/80 to-bg" />
         <div className="relative mx-auto max-w-6xl px-5 pb-10 pt-10">
@@ -34,12 +34,15 @@ function BookPage() {
           <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted">
             The house book on Solana devnet. Read from the chain every five seconds. Marked PnL, not a promised rate. Unaudited. Withdraw stays on in every state.
           </p>
-          <p className="mt-3 font-mono text-nano text-subtle">
+          {/* Two fixed lines: data arriving must not move the desk below (CLS). */}
+          <p className="mt-3 min-h-5 font-mono text-nano text-subtle">
             mandate{" "}
             <a href={explorerAccount(GATE_B_MANDATE)} target="_blank" rel="noreferrer" className="underline underline-offset-2">
               {short(GATE_B_MANDATE, 8, 8)}
             </a>
-            {s ? ` · owner ${short(s.mandate.owner)} · operator ${short(s.mandate.operator)} · slot ${s.data_slot}` : ""}
+          </p>
+          <p className="min-h-5 font-mono text-nano text-subtle">
+            owner {s ? short(s.mandate.owner) : "…"} · operator {s ? short(s.mandate.operator) : "…"} · slot {s ? s.data_slot : "…"}
           </p>
         </div>
       </section>

@@ -128,7 +128,7 @@ export function ReceiptList({
 
   const visible = rows.slice(0, Math.min(shown, total));
   return (
-    <ol className={cn("overflow-auto", maxHeight)} aria-live="polite" data-testid="receipt-list">
+    <ol className={cn("overflow-auto", maxHeight, maxHeight?.replace("max-h", "min-h"))} aria-live="polite" data-testid="receipt-list">
       {total === 0 ? (
         <li className="px-4 py-6 font-mono text-sm text-subtle" data-testid="receipt-empty">
           {empty}

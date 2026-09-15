@@ -37,13 +37,13 @@ function AccountPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-5 pb-20">
-        {!ready ? null : !selected ? (
+        {!ready || !selected ? (
           <div className="grid gap-6 md:grid-cols-[0.9fr_1.1fr]">
             <div className="rounded-md bg-surface p-5 shadow-hairline">
               <p className="font-mono text-micro uppercase tracking-eye text-subtle">Connect</p>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight">Pick a wallet.</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted">Devnet only in this stage. The Terminal never holds a key; your wallet signs every action after showing it to you.</p>
-              <div className="mt-4">
+              <div className="mt-4 min-h-40">
                 <WalletList />
               </div>
             </div>

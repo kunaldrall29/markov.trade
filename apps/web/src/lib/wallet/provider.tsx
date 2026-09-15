@@ -68,19 +68,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState(false);
 
-  // Register Mobile Wallet Adapter once, on the client. It is a no-op where
-  // no MWA-capable wallet exists (desktop without a paired phone).
+  // Register Mobile Wallet Adapter on the client: eagerly on phones, where it
+  // is the main connector and a persisted session should resume; otherwise
+  // only once the connect dialog opens, so desktop pages do not load it.
   useEffect(() => {
-    let cancelled = false;
-    void import("./mwa").then((m) => {
-      if (!cancelled) m.registerMobileWalletAdapter();
-    });
+    const phone = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (phone) void import("./mwa").then((m) => m.registerMobileWalletAdapter());
     setPersisted(readPersisted());
     setReady(true);
-    return () => {
-      cancelled = true;
-    };
   }, []);
+  useEffect(() => {
+    if (open) void import("./mwa").then((m) => m.registerMobileWalletAdapter());
+  }, [open]);
 
   // A wallet that was authorised before may expose its accounts only after a
   // silent connect (Wallet Standard `connect({ silent: true })`); ask once per

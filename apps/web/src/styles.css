@@ -9,7 +9,7 @@
   --mk-raised: #eceae4;
   --mk-fg: #161513;
   --mk-muted: #5c5953;
-  --mk-subtle: #8a8680;
+  --mk-subtle: #6b6760; /* ≥4.5:1 on bg, surface and raised (docs/13 §8) */
   --mk-line: #1615131a;
   --mk-line-strong: #16151338;
   --mk-allow: #2c6b48;
@@ -26,7 +26,7 @@
   --mk-raised: #242422;
   --mk-fg: #f4f3ef;
   --mk-muted: #a8a59e;
-  --mk-subtle: #6f6c66;
+  --mk-subtle: #8d8a83; /* ≥4.5:1 on bg, surface and raised (docs/13 §8) */
   --mk-line: #f4f3ef1f;
   --mk-line-strong: #f4f3ef47;
   --mk-allow: #6fba88;

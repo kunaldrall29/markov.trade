@@ -9,6 +9,7 @@ import { useBookStats, useReceiptFeed } from "@/lib/data/queries";
 import { ReceiptList } from "@/components/desk/receipt-list";
 import { CircuitChip } from "@/components/desk/circuit";
 import { Button } from "@/components/ui/button";
+import { Stat } from "@/components/ui/field";
 
 export function Blotter({ limit = 8 }: { limit?: number }) {
   const stats = useBookStats();
@@ -35,26 +36,10 @@ export function Blotter({ limit = 8 }: { limit?: number }) {
       </div>
 
       <dl className="grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
-        <div className="bg-raised px-4 py-3">
-          <dt className="font-mono text-nano uppercase tracking-wider text-subtle">net delta</dt>
-          <dd className="mt-1 font-mono text-xl tabular-nums">{s ? formatUnits(net, d) : "—"}</dd>
-          <p className="font-mono text-nano text-subtle">{s ? `±${formatUnits(BigInt(s.offchain_limits.delta_band.raw), d, { min: 0 })} · off-chain guard` : ""}</p>
-        </div>
-        <div className="bg-raised px-4 py-3">
-          <dt className="font-mono text-nano uppercase tracking-wider text-subtle">gross</dt>
-          <dd className="mt-1 font-mono text-xl tabular-nums">{s ? formatUnits(gross, d) : "—"}</dd>
-          <p className="font-mono text-nano text-subtle">{s ? `cap ${formatUnits(BigInt(s.offchain_limits.max_gross.raw), d, { min: 0 })} · off-chain guard` : ""}</p>
-        </div>
-        <div className="bg-raised px-4 py-3">
-          <dt className="font-mono text-nano uppercase tracking-wider text-subtle">vault</dt>
-          <dd className="mt-1 font-mono text-xl tabular-nums">{s ? formatUnits(BigInt(s.mandate.vault.raw), d) : "—"}</dd>
-          <p className="font-mono text-nano text-subtle">USDC-d · chain</p>
-        </div>
-        <div className="bg-raised px-4 py-3">
-          <dt className="font-mono text-nano uppercase tracking-wider text-subtle">refusals</dt>
-          <dd className={`mt-1 font-mono text-xl tabular-nums ${s && s.window.refusals > 0 ? "text-refuse" : "text-subtle"}`}>{s ? s.window.refusals : "—"}</dd>
-          <p className="font-mono text-nano text-subtle">{s ? (s.window.refusals === 0 ? "none in 24h" : "24h") : ""}</p>
-        </div>
+        <Stat label="net delta" value={s ? formatUnits(net, d) : "—"} note={s ? `±${formatUnits(BigInt(s.offchain_limits.delta_band.raw), d, { min: 0 })} · off-chain guard` : undefined} />
+        <Stat label="gross" value={s ? formatUnits(gross, d) : "—"} note={s ? `cap ${formatUnits(BigInt(s.offchain_limits.max_gross.raw), d, { min: 0 })} · off-chain guard` : undefined} />
+        <Stat label="vault" value={s ? formatUnits(BigInt(s.mandate.vault.raw), d) : "—"} note="USDC-d · chain" />
+        <Stat label="refusals" value={s ? s.window.refusals : "—"} tone={s && s.window.refusals > 0 ? "refuse" : "muted"} note={s ? (s.window.refusals === 0 ? "none in 24h" : "24h") : undefined} />
       </dl>
 
       {s ? <CircuitChip circuit={s.circuit} markAge={s.mark.pyth?.age_secs ?? null} /> : null}

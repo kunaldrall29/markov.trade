@@ -22,7 +22,7 @@ export function Hero() {
   return (
     <section className="relative min-h-[88svh] overflow-hidden">
       <div className="absolute inset-0">
-        <video className="h-full w-full object-cover" autoPlay muted loop playsInline poster="/images/hero-desk.jpg">
+        <video className="h-full w-full object-cover" autoPlay muted loop playsInline poster="/images/hero-desk-1280.jpg">
           <source src="/videos/hero-desk.mp4" type="video/mp4" />
         </video>
         <div className="hero-mask absolute inset-0" />

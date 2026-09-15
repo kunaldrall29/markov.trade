@@ -100,9 +100,8 @@ export function CinematicReel() {
                 variant="ghost"
                 onClick={toggleSound}
                 aria-pressed={sound}
-                aria-label={sound ? "Mute the film" : "Play the film with sound"}
               >
-                {sound ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
+                {sound ? <Volume2 className="size-4" aria-hidden="true" /> : <VolumeX className="size-4" aria-hidden="true" />}
                 {sound ? "Playing" : "Sound on"}
               </Button>
             ) : null}

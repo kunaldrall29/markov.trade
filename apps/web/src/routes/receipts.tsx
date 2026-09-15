@@ -40,12 +40,14 @@ function ReceiptsPage() {
         <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted">
           Every allow, every refusal and every owner action the program has emitted, decoded from inner-instruction data by IDL. Newest first. A zero-refusal book is ordinary; the interesting row is the one that says no.
         </p>
-        <p className="mt-3 font-mono text-nano text-subtle">
+        <p className="mt-3 min-h-5 font-mono text-nano text-subtle">
           program{" "}
           <a href={explorerAccount(MANDATE_PROGRAM_ID)} target="_blank" rel="noreferrer" className="underline underline-offset-2">
             {short(MANDATE_PROGRAM_ID, 8, 8)}
           </a>
-          {feed.data ? ` · slot ${feed.data.data_slot} · ${feed.data.signatures} signatures in this page` : ""}
+        </p>
+        <p className="min-h-5 font-mono text-nano text-subtle">
+          slot {feed.data ? feed.data.data_slot : "…"} · {feed.data ? feed.data.signatures : "…"} signatures in this page
         </p>
       </section>
 

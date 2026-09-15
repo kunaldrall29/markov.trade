@@ -47,7 +47,10 @@ function WalletRow({ wallet }: { wallet: UiWallet }) {
 }
 
 export function WalletList() {
-  const { wallets } = useWallet();
+  const { wallets, ready } = useWallet();
+  if (!ready) {
+    return <p className="min-h-12 font-mono text-xs text-subtle">detecting wallets…</p>;
+  }
   if (wallets.length === 0) {
     return (
       <div className="grid gap-3 text-sm leading-relaxed text-muted">
