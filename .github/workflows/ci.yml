@@ -1,0 +1,44 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  truth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @markov/facts test
+      - run: pnpm --filter @markov/policy test
+      - run: pnpm --filter @markov/risk test
+      - run: pnpm --filter @markov/router test
+      - run: pnpm --filter @markov/sdk test
+      - run: pnpm --filter @markov/adapters test
+      - run: pnpm --filter @markov/config test
+      - run: pnpm --filter @markov/api test
+      - run: pnpm --filter @markov/keeper test
+      - run: pnpm --filter @markov/mcp test
+      - run: node scripts/check-claims.mjs
+      - run: bash scripts/no-keys-in-tree.sh
+      - run: pnpm --filter @markov/adapters smoke:pacifica
+      - run: pnpm --filter @markov/adapters smoke:phoenix
+      - run: pnpm --filter @markov/adapters smoke:jupiter
+      - run: pnpm --filter @markov/terminal typecheck
+      - run: pnpm --filter @markov/landing typecheck
+  program:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.89.0
+          components: rustfmt, clippy
+      - run: cargo test -p markov --lib
