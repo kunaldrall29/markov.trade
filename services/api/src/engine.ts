@@ -21,6 +21,7 @@ import {
 import { check, type MandateView } from "@markov/policy";
 import { compareRoutes } from "@markov/router";
 import type { MarketStateDto, Receipt, VenueCapabilities } from "@markov/sdk";
+import { loadDisk, persist, type MandateDraft, type PendingTrade, type Proposal, type VenueLink } from "./store.ts";
 
 export type Cache = {
   env: EnvConfig;
@@ -31,6 +32,13 @@ export type Cache = {
   receipts: Receipt[];
   sessions: Map<string, { pubkey: string; exp: number }>;
   nonces: Map<string, { pubkey: string; exp: number; message: string }>;
+  proposals: Proposal[];
+  pending: PendingTrade[];
+  links: VenueLink[];
+  mandates: MandateDraft[];
+  investRules: Array<Record<string, unknown>>;
+  idem: Map<string, { at: number; status: number; body: unknown }>;
+  program: { deployed: boolean; slot: number | null; at: number };
 };
 
 const defaultMandate = (env: EnvConfig): MandateView => ({
@@ -44,15 +52,23 @@ const defaultMandate = (env: EnvConfig): MandateView => ({
 });
 
 export function createCache(env = loadEnv()): Cache {
+  const disk = loadDisk();
   return {
     env,
     pacifica: new Map(),
     phoenix: new Map(),
     lastPacificaOk: 0,
     lastPhoenixOk: 0,
-    receipts: [],
+    receipts: disk.receipts,
     sessions: new Map(),
     nonces: new Map(),
+    proposals: disk.proposals,
+    pending: disk.pending,
+    links: disk.links,
+    mandates: disk.mandates,
+    investRules: disk.investRules,
+    idem: new Map(),
+    program: { deployed: false, slot: null, at: 0 },
   };
 }
 
@@ -90,6 +106,9 @@ export function dto(canonical: string, state: MarketState, env: EnvConfig, execu
     data_slot: state.slot,
     bids: state.bids.slice(0, 16),
     asks: state.asks.slice(0, 16),
+    tick_size: state.tickSize,
+    lot_size: state.lotSize,
+    min_order_size: state.minOrderSize,
   };
 }
 
@@ -267,6 +286,7 @@ export function recordReceipt(cache: Cache, partial: Omit<Receipt, "env" | "crea
     created_at: new Date().toISOString(),
   };
   cache.receipts.unshift(rec);
+  persist(cache);
   return rec;
 }
 

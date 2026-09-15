@@ -111,7 +111,12 @@ export function createMcp() {
     "invest.propose_rule",
     "Creates a pending proposal. Owner must sign. Models cannot execute.",
     { mint: z.string(), usd_per_period: z.number(), period_seconds: z.number() },
-    async () => text({ decision: "REQUIRE_APPROVAL", signable_for_owner: false, note: "Proposal lands in /approvals" }),
+    async (args) => {
+      const r = await api("/invest/propose", { method: "POST", body: JSON.stringify(args) });
+      const json = r.json as { signables?: unknown };
+      delete json.signables;
+      return text({ ...r, signable_for_model: false });
+    },
   );
   server.tool("invest.pause_rule", "Owner must confirm pause.", { id: z.string() }, async () =>
     text(await api("/invest/pause", { method: "POST", body: JSON.stringify({}) })),

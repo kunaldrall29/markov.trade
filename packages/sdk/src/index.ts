@@ -62,6 +62,7 @@ export function createApiClient(opts: ApiClientOpts) {
     health: () => req<{ ok: boolean; env: string; slot: number }>(opts, "/health"),
     markets: () => req<{ env: string; data_slot: number; markets: MarketStateDto[] }>(opts, "/markets"),
     market: (id: string) => req<{ env: string; market: MarketStateDto; venues: MarketStateDto[] }>(opts, `/markets/${id}`),
+    candles: (id: string) => req<{ candles: Array<{ openTime: number; open: number; high: number; low: number; close: number }> }>(opts, `/markets/${id}/candles`),
     capabilities: () => req<{ env: string; venues: VenueCapabilities[] }>(opts, "/venues/capabilities"),
     policyCheck: (body: unknown) =>
       req<PolicyPreview>(opts, "/policy/check", { method: "POST", body: JSON.stringify(body) }),
@@ -72,6 +73,8 @@ export function createApiClient(opts: ApiClientOpts) {
     portfolio: () => req<unknown>(opts, "/portfolio"),
     positions: () => req<unknown>(opts, "/positions"),
     mandate: () => req<unknown>(opts, "/mandate"),
+    investPropose: (body: unknown) =>
+      req<unknown>(opts, "/invest/propose", { method: "POST", body: JSON.stringify(body) }),
     investRules: () => req<unknown>(opts, "/invest/rules"),
     risk: () => req<unknown>(opts, "/risk"),
     challenge: (pubkey: string) =>
