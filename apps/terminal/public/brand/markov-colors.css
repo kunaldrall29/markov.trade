@@ -1,0 +1,15 @@
+:root{
+  --mk-cream: #ECEBE6;
+  --mk-clay: #F6F5F0;
+  --mk-ink: #1C1C1A;
+  --mk-graphite: #3A3A37;
+  --mk-muted: #5A5A56;
+  --mk-blue: #2F3BE0;
+  --mk-blue-on-ink: #8EA0FF;
+  --mk-verified: #2E8B57;
+  --mk-verified-on-ink: #7CF29A;
+  --mk-signal: #E8552B;
+  --mk-font-display: 'Bricolage Grotesque', sans-serif;
+  --mk-font-body: 'Instrument Sans', system-ui, sans-serif;
+  --mk-font-mono: 'JetBrains Mono', monospace;
+}

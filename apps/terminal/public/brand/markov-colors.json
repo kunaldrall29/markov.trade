@@ -1,0 +1,24 @@
+{
+  "color": {
+    "cream": "#ECEBE6",
+    "clay": "#F6F5F0",
+    "ink": "#1C1C1A",
+    "graphite": "#3A3A37",
+    "muted": "#5A5A56",
+    "blue": "#2F3BE0",
+    "blueOnInk": "#8EA0FF",
+    "verified": "#2E8B57",
+    "verifiedOnInk": "#7CF29A",
+    "signal": "#E8552B"
+  },
+  "font": {
+    "display": "Bricolage Grotesque",
+    "body": "Instrument Sans",
+    "mono": "JetBrains Mono"
+  },
+  "radius": {
+    "chip": 999,
+    "card": 24,
+    "panel": 28
+  }
+}

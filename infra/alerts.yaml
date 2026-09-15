@@ -1,0 +1,10 @@
+# Alerts
+
+Page when:
+
+- Pacifica or Phoenix freshness exceeds 3× the window in FACTS §5 for 2 minutes
+- Keeper cycle misses a due rule without a skip receipt
+- Program upgrade authority is not the expected Squads (mainnet)
+- API `/health` is non-200 for 2 minutes
+
+Until those monitors exist in production, the control plane logs JSON with `request_id`.

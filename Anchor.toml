@@ -1,10 +1,8 @@
-# Pins are binding (docs/08 §1, ADR-001). Every `anchor` invocation re-initialises
-# the active Solana release to `solana_version`; never run anchor outside this
-# directory.
+# Pins: Anchor 1.2.0 (crates.io line this workspace compiles against). Program ID is facts.
 skip_local_validator = true
 
 [toolchain]
-anchor_version = "1.1.2"
+anchor_version = "1.2.0"
 solana_version = "4.2.2"
 
 [features]
@@ -12,18 +10,19 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-markov_mandate = "25CdYaZeB18QvUR7cTyZPgTZPNREb7t6xL8zmk1eXAU6"
-demo_perps = "3Zcd8XsFWBTVku5GxQjwEBC7sLrJhF8vadyTnTr56hxB"
+markov = "37rW4ETzh8o7ebWFnrJRKt7iCUvWdxsv37vPENjAYz1J"
 
 [programs.localnet]
-markov_mandate = "25CdYaZeB18QvUR7cTyZPgTZPNREb7t6xL8zmk1eXAU6"
-demo_perps = "3Zcd8XsFWBTVku5GxQjwEBC7sLrJhF8vadyTnTr56hxB"
+markov = "37rW4ETzh8o7ebWFnrJRKt7iCUvWdxsv37vPENjAYz1J"
+
+[programs.mainnet]
+markov = "37rW4ETzh8o7ebWFnrJRKt7iCUvWdxsv37vPENjAYz1J"
 
 [provider]
 cluster = "devnet"
 wallet = "keys/deployer.json"
 
 [scripts]
-test = "cargo test -p markov_mandate -p demo_perps"
+test = "cargo test -p markov"
 
 [hooks]

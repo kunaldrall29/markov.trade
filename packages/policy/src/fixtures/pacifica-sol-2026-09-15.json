@@ -1,0 +1,10 @@
+{
+  "recorded_at": "2026-09-15T08:30:49Z",
+  "source": "https://api.pacifica.fi/api/v1/info/prices",
+  "symbol": "SOL",
+  "mark": "100.324",
+  "funding": "-0.00000358",
+  "venue_ts": 1789461043710,
+  "freshness_limit_ms": 3000,
+  "note": "Live Pacifica mainnet print. Not a price the Terminal may invent."
+}

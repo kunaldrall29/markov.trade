@@ -1,4 +1,4 @@
-# secrets — never committed (docs/14-SECURITY-AND-KEYS.md §5)
+# secrets
 *.json.key
 keys/*.json
 **/secrets/
@@ -6,25 +6,31 @@ keys/*.json
 .env.*
 !.env.example
 
-# build output
+# build
 target/
 node_modules/
 dist/
 .turbo/
 .anchor/
+.next/
+.vercel
+.output/
 test-ledger/
+*.so
+coverage/
+.pglite/
+data/
+**/control-plane.json
+.playwright-mcp/
 
 # editor / os
 .DS_Store
 .idea/
 .vscode/
 *.swp
+*.swo
 
-# P01 additions
-.turbo/
-**/.vercel/output/
-**/.output/
-*.so
-
-# paper tick logs are diagnostics, not the product; the daily .md files are committed
-paper/ticks/
+# generated
+apps/terminal/next-env.d.ts
+apps/landing/next-env.d.ts
+*.tsbuildinfo
