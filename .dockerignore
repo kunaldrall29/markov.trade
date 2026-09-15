@@ -1,0 +1,8 @@
+node_modules
+.next
+.git
+target
+*.md
+keys
+paper
+apps/landing
