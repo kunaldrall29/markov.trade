@@ -79,8 +79,13 @@ button { font-family: inherit; }
   background: var(--mk-blue) !important;
   border-radius: 999px !important;
   font-family: var(--font-body), system-ui, sans-serif !important;
-  height: 40px !important;
-  font-size: 13px !important;
+  height: 36px !important;
+  font-size: 12px !important;
+  padding: 0 12px !important;
+  white-space: nowrap !important;
+}
+@media (max-width: 640px) {
+  .wallet-adapter-button { max-width: 42vw; overflow: hidden; }
 }
 .wallet-adapter-modal-wrapper { font-family: var(--font-body), system-ui, sans-serif !important; }
 

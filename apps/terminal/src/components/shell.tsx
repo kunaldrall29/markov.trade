@@ -6,6 +6,8 @@ import { useState } from "react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { programId, stageLabel } from "@/lib/env";
+import { Palette } from "@/components/palette";
+import { ApiBanner } from "@/components/api-banner";
 
 const NAV = [
   ["Overview", "/overview"],
@@ -73,8 +75,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
             mandate v0
           </span>
           <span className="num hidden md:inline text-[11px] text-[var(--mk-muted)] truncate max-w-[220px]">{programId}</span>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="hidden sm:inline text-[12px] text-[var(--mk-muted)]">
+          <div className="ml-auto flex items-center gap-2 min-w-0">
+            <ApiBanner />
+            <span className="hidden sm:inline text-[12px] text-[var(--mk-muted)] truncate">
               {connected && pk ? `${pk.slice(0, 4)}…${pk.slice(-4)}` : "read-only until connected"}
             </span>
             <WalletMultiButton />
@@ -99,6 +102,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             More
           </button>
         </nav>
+        <Palette />
         {more && (
           <div className="lg:hidden fixed inset-0 z-20 bg-black/30" onClick={() => setMore(false)}>
             <div

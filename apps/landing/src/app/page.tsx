@@ -1,4 +1,5 @@
 import { STAGE, CAPS, PROGRAM_ID } from "@markov/facts";
+import { LiveStrip } from "./live";
 
 const APP = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -17,6 +18,7 @@ export default function Home() {
       <p className="mono" style={{ marginTop: 48 }}>
         {STAGE}
       </p>
+      <LiveStrip />
       <h1>
         Perps that obey{" "}
         <br />
@@ -40,7 +42,7 @@ export default function Home() {
           <div className="mono">Receipts</div>
           <p style={{ fontSize: 28, fontFamily: "var(--font-display)", fontWeight: 800, margin: "8px 0 0" }}>0 on chain</p>
           <p style={{ color: "var(--muted)", fontSize: 14 }}>
-            Program {PROGRAM_ID.slice(0, 4)}…{PROGRAM_ID.slice(-4)} is generated, not deployed. Control-plane receipts exist in-process after a request.
+            Program {PROGRAM_ID.slice(0, 4)}…{PROGRAM_ID.slice(-4)} is generated, not deployed. Off-chain receipts persist on the control plane disk, not on chain.
           </p>
         </div>
         <div className="card">

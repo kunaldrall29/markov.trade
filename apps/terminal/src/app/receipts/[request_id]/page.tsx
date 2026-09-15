@@ -11,11 +11,26 @@ export default function Receipt() {
   useEffect(() => {
     api(`/receipts/${request_id}`).then(setRaw).catch((e: Error) => setErr(e.message));
   }, [request_id]);
+  const text = raw ? JSON.stringify(raw, null, 2) : "";
   return (
     <div className="grid gap-4">
-      <h1 className="text-[28px] tracking-[-0.04em]" style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>Receipt</h1>
+      <h1 className="text-[28px] tracking-[-0.04em]" style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>
+        Receipt
+      </h1>
       {err && <p className="text-[var(--mk-signal)]">{err}</p>}
-      <pre className="ink p-4 overflow-auto text-[12px] font-mono">{raw ? JSON.stringify(raw, null, 2) : "…"}</pre>
+      <div className="flex gap-2">
+        <button
+          className="btn btn-ghost"
+          disabled={!text}
+          onClick={() => {
+            void navigator.clipboard.writeText(text);
+          }}
+        >
+          Copy JSON
+        </button>
+        <p className="text-[12px] text-[var(--mk-muted)] self-center">Verify on chain is disabled until FACTS lists the program as deployed.</p>
+      </div>
+      <pre className="ink p-4 overflow-auto text-[12px] font-mono">{text || "…"}</pre>
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import bs58 from "bs58";
 import { api } from "@/lib/api";
+import { CandleChart } from "@/components/candles";
+import { Depth } from "@/components/depth";
 
 type Level = { price: number; size: number };
 type Venue = {
@@ -21,6 +23,9 @@ type Venue = {
   freshness_ms: number;
   bids?: Level[];
   asks?: Level[];
+  tick_size?: number | null;
+  lot_size?: number | null;
+  min_order_size?: number | null;
 };
 
 type Preview = {
@@ -31,12 +36,16 @@ type Preview = {
   checks: Array<{ rule: number; observed: string; limit: string; pass: boolean }>;
 };
 
-type Signable = { kind: string; display: string; compact_json: string | null; note?: string };
+type Signable = { kind: string; display: string; compact_json: string | null; note?: string; fields?: Record<string, string> };
+type Candle = { openTime: number; open: number; high: number; low: number; close: number };
+
+const STATES = ["IDLE", "PREVIEW", "ROUTED", "SIMULATED", "REQUESTED", "AWAITING_SIGNATURE", "SUBMITTED", "FAILED"] as const;
 
 export default function MarketWorkspace() {
   const { id } = useParams<{ id: string }>();
   const { connected, signMessage } = useWallet();
   const [venues, setVenues] = useState<Venue[]>([]);
+  const [candles, setCandles] = useState<Candle[]>([]);
   const [side, setSide] = useState<"long" | "short">("long");
   const [notional, setNotional] = useState("50");
   const [leverage, setLeverage] = useState("1.5");
@@ -46,6 +55,27 @@ export default function MarketWorkspace() {
   const [msg, setMsg] = useState<string | null>(null);
   const [signable, setSignable] = useState<Signable | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
+  const [state, setState] = useState<(typeof STATES)[number]>("IDLE");
+  const [narrow, setNarrow] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const apply = () => setNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "l" || e.key === "L") setSide("long");
+      if (e.key === "s" || e.key === "S") setSide("short");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     const load = () =>
@@ -57,7 +87,14 @@ export default function MarketWorkspace() {
     return () => clearInterval(t);
   }, [id]);
 
+  useEffect(() => {
+    api<{ candles: Candle[] }>(`/markets/${id}/candles?venue=pacifica&interval=1h&hours=48`)
+      .then((r) => setCandles(r.candles ?? []))
+      .catch(() => setCandles([]));
+  }, [id]);
+
   const book = venues.find((v) => v.venue === "pacifica") ?? venues[0];
+  const phoenixPinned = venue === "phoenix";
 
   async function simulate() {
     setMsg(null);
@@ -76,6 +113,7 @@ export default function MarketWorkspace() {
     ]);
     setPreview(p);
     setRoutes(r.routes);
+    setState(p.stale ? "PREVIEW" : "SIMULATED");
   }
 
   async function request() {
@@ -90,22 +128,30 @@ export default function MarketWorkspace() {
       decision: string;
       reason: string;
       request_id: string;
+      state?: string;
       approval_required?: boolean;
       signables?: Signable[];
     }>("/trades/request", { method: "POST", body: JSON.stringify(body) });
     setRequestId(res.request_id);
     setSignable(res.signables?.[0] ?? null);
     setMsg(`${res.decision} · ${res.reason} · ${res.request_id}`);
+    setState(res.signables?.[0]?.compact_json ? "AWAITING_SIGNATURE" : res.decision === "REJECT" ? "FAILED" : "REQUESTED");
   }
 
   async function signPayload() {
     if (!signable?.compact_json || !signMessage || !requestId) return;
-    const sig = await signMessage(new TextEncoder().encode(signable.compact_json));
-    await api("/trades/confirm-signature", {
-      method: "POST",
-      body: JSON.stringify({ request_id: requestId, signature: bs58.encode(sig) }),
-    });
-    setMsg(`signature stored on receipt ${requestId}. not a fill.`);
+    try {
+      const sig = await signMessage(new TextEncoder().encode(signable.compact_json));
+      const out = await api<{ ok: boolean; note?: string; venue_status?: number }>("/trades/submit", {
+        method: "POST",
+        body: JSON.stringify({ request_id: requestId, signature: bs58.encode(sig) }),
+      });
+      setState(out.ok ? "SUBMITTED" : "FAILED");
+      setMsg(out.note ?? `venue ${out.venue_status}`);
+    } catch (e) {
+      setState("FAILED");
+      setMsg(e instanceof Error ? e.message : "submit failed");
+    }
   }
 
   return (
@@ -118,6 +164,9 @@ export default function MarketWorkspace() {
           <h1 className="mt-2 text-[32px] tracking-[-0.04em]" style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>
             {id}
           </h1>
+        </div>
+        <div className="clay p-4 overflow-x-auto">
+          <CandleChart candles={candles} label="Pacifica testnet · 1h kline · live" />
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           {venues.map((v) => (
@@ -142,41 +191,32 @@ export default function MarketWorkspace() {
                 <dd className="num">
                   {v.freshness_ms}ms {v.stale ? "STALE" : ""}
                 </dd>
+                <dt>min size</dt>
+                <dd className="num">{v.min_order_size ?? "—"}</dd>
               </dl>
             </div>
           ))}
         </div>
         {book && (book.bids?.length || book.asks?.length) ? (
           <div className="clay p-4 overflow-x-auto">
-            <h2 className="text-[13px] font-semibold">Book · {book.venue}</h2>
-            <div className="mt-2 grid grid-cols-2 gap-3 text-[12px] font-mono">
-              <div>
-                <div className="text-[var(--mk-muted)] uppercase tracking-[0.08em] text-[11px]">Bids</div>
-                {(book.bids ?? []).slice(0, 8).map((l, i) => (
-                  <div key={`b${i}`} className="flex justify-between">
-                    <span>{l.price}</span>
-                    <span>{l.size}</span>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div className="text-[var(--mk-muted)] uppercase tracking-[0.08em] text-[11px]">Asks</div>
-                {(book.asks ?? []).slice(0, 8).map((l, i) => (
-                  <div key={`a${i}`} className="flex justify-between">
-                    <span>{l.price}</span>
-                    <span>{l.size}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <Depth bids={book.bids ?? []} asks={book.asks ?? []} venue={book.venue} />
           </div>
         ) : null}
         {routes.length > 0 && (
           <div className="clay p-4">
             <h2 className="text-[13px] font-semibold">Route (72h lifecycle cost)</h2>
-            <ul className="mt-2 grid gap-1 text-[12px] font-mono">
+            <ul className="mt-2 grid gap-2 text-[12px] font-mono">
               {routes.map((r) => (
                 <li key={r.venue}>
+                  <div className="h-2 rounded-full bg-black/5 overflow-hidden">
+                    <div
+                      className="h-full"
+                      style={{
+                        width: `${Math.min(100, r.totalBps)}%`,
+                        background: r.executable ? "var(--mk-blue)" : "#3a3a37",
+                      }}
+                    />
+                  </div>
                   {r.selected ? "→ " : "  "}
                   {r.venue} {r.totalBps.toFixed(1)} bps {r.executable ? "" : "(not executable)"} — {r.reason}
                 </li>
@@ -188,8 +228,13 @@ export default function MarketWorkspace() {
       <aside className="clay p-4 lg:sticky lg:top-20 h-fit">
         <h2 className="font-semibold">Ticket</h2>
         <p className="text-[12px] text-[var(--mk-muted)] mt-1">
-          Owner signs. Phones can submit a request; the wallet prompt is the authority.
+          Owner signs. Keys L / S flip side. Phoenix cannot execute.
         </p>
+        {narrow && (
+          <p className="mt-2 text-[12px] text-[var(--mk-muted)]">
+            On phones the wallet sheet is the authority. Request queues a payload; it does not auto-send.
+          </p>
+        )}
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button className={`btn ${side === "long" ? "" : "btn-ghost"}`} onClick={() => setSide("long")}>
             Long
@@ -223,18 +268,19 @@ export default function MarketWorkspace() {
           <button className="btn btn-ghost flex-1" onClick={() => void simulate()}>
             Simulate
           </button>
-          <button className="btn flex-1" disabled={!connected} onClick={() => void request()}>
+          <button className="btn flex-1" disabled={!connected || phoenixPinned} onClick={() => void request()}>
             Request
           </button>
         </div>
         {signable?.compact_json && (
           <button className="btn mt-2 w-full" onClick={() => void signPayload()}>
-            Sign Pacifica payload
+            Sign and submit to Pacifica
           </button>
         )}
         {!connected && (
           <p className="mt-2 text-[12px] text-[var(--mk-muted)]">Connect a wallet to request. Simulate works disconnected.</p>
         )}
+        {phoenixPinned && <p className="mt-2 text-[12px] text-[var(--mk-signal)]">Phoenix is INTEGRATED · read-only.</p>}
         {preview && (
           <div className="mt-4 text-[12px]">
             <div className="chip" style={{ background: preview.decision === "ALLOW" ? "#d9f3e5" : "#fde4dc" }}>
@@ -255,6 +301,7 @@ export default function MarketWorkspace() {
             </table>
           </div>
         )}
+        <p className="mt-3 text-[11px] font-mono uppercase tracking-[0.08em] text-[var(--mk-muted)]">{state}</p>
         {msg && <p className="mt-3 text-[12px] font-mono break-all">{msg}</p>}
       </aside>
     </div>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { stageLabel } from "@/lib/env";
 
-type Health = { ok: boolean; env: string; pacifica_markets: number; phoenix_markets: number };
+type Health = { ok: boolean; env: string; pacifica_markets: number; phoenix_markets: number; program_deployed: boolean; receipts: number };
 type Markets = { markets: Array<{ canonical_market_id: string; venue: string; mark: number | null; stale: boolean; executable: boolean; funding: number | null; freshness_ms: number }> };
 type Receipts = { receipts: Array<{ request_id: string; decision: string; reason: string; market_id: string }> };
 
@@ -64,6 +64,7 @@ export default function Overview() {
             <li className="flex justify-between"><span>Pacifica {health ? `(${health.pacifica_markets} cached)` : ""}</span><span className="chip" style={{ background: "#e8edff", color: "var(--mk-blue)" }}>executable · {health?.env}</span></li>
             <li className="flex justify-between"><span>Drift</span><span className="chip" style={{ background: "white" }}>stale-closed · no HTTP</span></li>
             <li className="flex justify-between"><span>Phoenix</span><span className="chip" style={{ background: "white" }}>INTEGRATED · read-only</span></li>
+            <li className="flex justify-between"><span>Program</span><span className="chip" style={{ background: "white" }}>{health?.program_deployed ? "on chain" : "undeployed"}</span></li>
           </ul>
         </div>
         <div className="ink p-5">

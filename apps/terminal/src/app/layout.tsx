@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { WalletRoot } from "@/components/wallet-root";
-import { Shell } from "@/components/shell";
+import { Providers } from "@/components/providers";
 import { stageLabel } from "@/lib/env";
 
 const display = Bricolage_Grotesque({
@@ -40,9 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body>
-        <WalletRoot>
-          <Shell>{children}</Shell>
-        </WalletRoot>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
