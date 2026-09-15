@@ -61,11 +61,12 @@ export default function RiskPage() {
           Simulate
         </button>
         {sim && (
-          <p className="text-[13px] font-mono">
-            SIMULATED · {sim.price_shock_bps} bps · equity {sim.equityUsd ?? "null"} · leverage {sim.leverage ?? "null"}
-            <br />
-            {sim.note}
-          </p>
+          <div className="text-[13px] font-mono grid gap-1">
+            <p>
+              SIMULATED · {sim.price_shock_bps} bps · equity {sim.equityUsd ?? "null"} · leverage {sim.leverage ?? "null"}
+            </p>
+            <p className="text-[var(--mk-muted)]">{sim.note}</p>
+          </div>
         )}
       </div>
     </Page>

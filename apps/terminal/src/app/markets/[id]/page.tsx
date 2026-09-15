@@ -156,16 +156,17 @@ export default function MarketWorkspace() {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-      <div className="grid gap-3 lg:order-none order-2">
-        <div>
-          <p className="chip" style={{ background: "white" }}>
-            {id}
-          </p>
-          <h1 className="mt-2 text-[32px] tracking-[-0.04em]" style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>
-            {id}
-          </h1>
-        </div>
+    <div className="grid gap-4">
+      <div>
+        <p className="chip" style={{ background: "white" }}>
+          {id}
+        </p>
+        <h1 className="mt-2 text-[32px] tracking-[-0.04em]" style={{ fontFamily: "var(--font-display)", fontWeight: 800 }}>
+          {id}
+        </h1>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid gap-3 order-2 lg:order-1">
         <div className="clay p-4 overflow-x-auto">
           <CandleChart candles={candles} label="Pacifica testnet · 1h kline · live" />
         </div>
@@ -226,7 +227,7 @@ export default function MarketWorkspace() {
           </div>
         )}
       </div>
-      <aside className="clay p-4 lg:sticky lg:top-20 h-fit order-1 lg:order-none">
+      <aside className="clay p-4 lg:sticky lg:top-20 h-fit order-1 lg:order-2">
         <h2 className="font-semibold">Ticket</h2>
         <p className="text-[12px] text-[var(--mk-muted)] mt-1">
           Owner signs. Keys L / S flip side. Phoenix cannot execute.
@@ -309,6 +310,7 @@ export default function MarketWorkspace() {
         <p className="mt-3 text-[11px] font-mono uppercase tracking-[0.08em] text-[var(--mk-muted)]">{state}</p>
         {msg && <p className="mt-3 text-[12px] font-mono break-all">{msg}</p>}
       </aside>
+      </div>
     </div>
   );
 }
