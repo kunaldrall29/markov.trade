@@ -68,6 +68,7 @@ export default function MandatePage() {
         <button className="btn w-fit" disabled={!connected} onClick={() => void save()}>
           Save draft
         </button>
+        <div className="flex flex-wrap gap-2">
         <button
           className="btn btn-ghost w-fit"
           disabled={!connected}
@@ -79,6 +80,18 @@ export default function MandatePage() {
         >
           Pause account
         </button>
+        <button
+          className="btn btn-ghost w-fit"
+          disabled={!connected}
+          onClick={() =>
+            void api<{ receipt_id: string }>("/mandate/unpause", { method: "POST", body: "{}" }).then((r) =>
+              setMsg(`unpause queued · ${r.receipt_id}`),
+            )
+          }
+        >
+          Unpause account
+        </button>
+        </div>
         {!connected && <p className="text-[12px] text-[var(--mk-muted)]">Connect and SIWS to write a draft.</p>}
         {msg && <p className="text-[12px] font-mono break-all">{msg}</p>}
       </div>

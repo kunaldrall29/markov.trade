@@ -155,6 +155,23 @@ export default function MarketWorkspace() {
     }
   }
 
+  async function cancelOrder() {
+    const cloid = signable?.fields?.client_order_id ?? requestId;
+    if (!cloid) return;
+    const res = await api<{
+      request_id: string;
+      signables?: Signable[];
+      reason?: string;
+    }>("/orders/cancel", {
+      method: "POST",
+      body: JSON.stringify({ market: id, client_order_id: cloid }),
+    });
+    setRequestId(res.request_id);
+    setSignable(res.signables?.[0] ?? null);
+    setState("AWAITING_SIGNATURE");
+    setMsg(res.signables?.[0]?.display ?? "cancel queued");
+  }
+
   return (
     <div className="grid gap-4">
       <div>
@@ -281,6 +298,11 @@ export default function MarketWorkspace() {
         {signable?.compact_json && (
           <button className="btn mt-2 w-full" onClick={() => void signPayload()}>
             Sign and submit to Pacifica
+          </button>
+        )}
+        {connected && requestId && (
+          <button className="btn btn-ghost mt-2 w-full" onClick={() => void cancelOrder()}>
+            Cancel by client order id
           </button>
         )}
         {!connected && (

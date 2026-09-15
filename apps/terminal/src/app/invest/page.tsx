@@ -101,9 +101,9 @@ export default function Invest() {
           <ul className="mt-3 grid gap-2 text-[13px] font-mono">
             {rules.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-2">
-                <span>
+                <a href={`/invest/rules/${r.id}`} className="underline-offset-2 hover:underline">
                   {r.status} · ${r.usd_per_period} · {r.mint.slice(0, 8)}…
-                </span>
+                </a>
                 <button
                   className="btn btn-ghost"
                   disabled={!connected}
